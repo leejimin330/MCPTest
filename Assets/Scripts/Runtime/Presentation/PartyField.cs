@@ -71,15 +71,21 @@ namespace FarmCreature.Presentation
             }
         }
 
-        /// <summary>겹쳐 서지 않도록 필드 폭을 인원수로 나눠 배치한다.</summary>
-        private static float SpawnX(int index, int count)
+        /// <summary>
+        /// 겹쳐 서지 않도록 필드 폭을 인원수로 나눠 배치한다.
+        /// <b>맵 안쪽으로 잡는다</b> — 예전에는 <c>HalfWidth * 1.4</c> 로 바깥을 목표로 삼아
+        /// 클램프에 걸린 파티원이 가장자리에 붙어 멈춰 있었다 (HANDOFF 4.6).
+        ///
+        /// 테스트가 부르므로 public 이다. 배치 산술은 MonoBehaviour 없이 검증된다.
+        /// </summary>
+        public static float SpawnX(int index, int count)
         {
             if (count <= 1)
             {
                 return 0f;
             }
 
-            float usable = FarmArea.HalfWidth * 1.4f;
+            float usable = FarmArea.HalfWidth - 2f;
             float step = usable * 2f / (count - 1);
             return -usable + step * index;
         }

@@ -17,10 +17,13 @@ namespace FarmCreature.Presentation
 
         /// <summary>
         /// 맵의 좌우 반너비. 16:9 화면 반너비는 약 8.9 이므로 슬라이드가 필요하다.
-        /// 건물 4동이 −9 / −3 / 3 / 9 에 서 있어 한 화면에 2~3동이 보이고,
+        /// 건물 5동이 −12 / −6 / 0 / +6 / +12 에 서 있어 한 화면에 2~3동이 보이고,
         /// 밀면 나머지가 드러난다.
+        ///
+        /// 카메라는 (HalfWidth − 화면 반너비) 로 클램프되므로 <b>보이는 한계가 곧 이 값</b>이다.
+        /// 건물 본체 폭이 3.4 라 +12 건물의 가장자리가 13.7 이고, 13 이면 잘린다.
         /// </summary>
-        public const float HalfWidth = 13f;
+        public const float HalfWidth = 15f;
 
         public static float ClampX(float x, float margin)
         {

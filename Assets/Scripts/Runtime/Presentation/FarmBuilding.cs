@@ -15,7 +15,10 @@ namespace FarmCreature.Presentation
         Storage,
 
         /// <summary>상점 — 여러 가지를 산다.</summary>
-        Shop
+        Shop,
+
+        /// <summary>전투터 — 상대를 골라 전투 씬으로 나간다.</summary>
+        BattleGround
     }
 
     /// <summary>
@@ -102,6 +105,8 @@ namespace FarmCreature.Presentation
                     return "몬스터에게 아이템을 장착시키는 곳. (기능 준비 중)";
                 case BuildingKind.Shop:
                     return "여러 가지를 살 수 있는 곳. (기능 준비 중)";
+                case BuildingKind.BattleGround:
+                    return "상대를 골라 나가는 곳. (기능 준비 중)";
                 default:
                     return "(기능 준비 중)";
             }

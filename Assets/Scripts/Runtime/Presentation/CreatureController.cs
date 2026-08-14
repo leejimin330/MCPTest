@@ -109,11 +109,15 @@ namespace FarmCreature.Presentation
             SnapToGround(transform.position.x);
         }
 
-        /// <summary>슬롯을 다시 쓸 때 겹쳐 서지 않도록 시작 위치를 지정한다.</summary>
+        /// <summary>
+        /// 슬롯을 다시 쓸 때 겹쳐 서지 않도록 시작 위치를 지정한다.
+        /// 목표는 <b>클램프된 뒤의 좌표</b>로 잡는다 — 맵 밖을 목표로 두면 도착 판정이 서지 않아
+        /// 재탐색 타이머가 돌 때까지 그 자리에 멈춰 있는다 (HANDOFF 4.6).
+        /// </summary>
         public void PlaceAt(float x)
         {
             SnapToGround(x);
-            targetX = x;
+            targetX = transform.position.x;
             repathTimer = repathInterval;
             restTimer = 0f;
         }
