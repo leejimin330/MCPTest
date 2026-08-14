@@ -2,7 +2,11 @@ using UnityEngine;
 
 namespace FarmCreature.Presentation
 {
-    /// <summary>농장에 세워지는 건물 종류.</summary>
+    /// <summary>
+    /// 농장에 세워지는 건물 종류.
+    /// 씬에 <b>정수로 직렬화</b>되므로 새 값은 반드시 마지막에 붙인다 — 중간에 끼워 넣으면
+    /// 이미 저장된 건물들의 종류가 통째로 밀린다.
+    /// </summary>
     public enum BuildingKind
     {
         /// <summary>헛간 — 몬스터를 넣고 꺼낸다.</summary>
