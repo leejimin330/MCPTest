@@ -13,19 +13,27 @@ namespace FarmCreature.Tests
     {
         private const string SpeciesDbPath = "Assets/GameData/SpeciesDatabase.asset";
         private const string ItemDbPath = "Assets/GameData/ItemDatabase.asset";
+        private const string EggDbPath = "Assets/GameData/EggDatabase.asset";
+        private const string ShopStockPath = "Assets/GameData/ShopStockDatabase.asset";
         private const int SafetyCap = 300;
 
         private SpeciesDatabase speciesDb;
         private ItemDatabase itemDb;
+        private EggDatabase eggDb;
+        private ShopStockDatabase shopStock;
 
         [SetUp]
         public void SetUp()
         {
             speciesDb = AssetDatabase.LoadAssetAtPath<SpeciesDatabase>(SpeciesDbPath);
             itemDb = AssetDatabase.LoadAssetAtPath<ItemDatabase>(ItemDbPath);
+            eggDb = AssetDatabase.LoadAssetAtPath<EggDatabase>(EggDbPath);
+            shopStock = AssetDatabase.LoadAssetAtPath<ShopStockDatabase>(ShopStockPath);
 
             Assert.IsNotNull(speciesDb, "SpeciesDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
             Assert.IsNotNull(itemDb, "ItemDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
+            Assert.IsNotNull(eggDb, "EggDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
+            Assert.IsNotNull(shopStock, "ShopStockDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
         }
 
         // ---- 데이터 무결성 ----
@@ -254,6 +262,65 @@ namespace FarmCreature.Tests
             Assert.IsTrue(CareActions.Unequip(creature, inventory).Success);
             Assert.AreEqual(1, inventory.GetCount(shell.itemId));
             Assert.IsNull(creature.EquippedItem);
+        }
+
+        // ---- 상점 데이터 ----
+
+        [Test]
+        public void ShopStock_EveryEntry_PointsAtRealThingWithAPrice()
+        {
+            Assert.Greater(shopStock.Count, 0, "살 수 있는 것이 하나도 없으면 상점이 아니다");
+
+            for (int i = 0; i < shopStock.Count; i++)
+            {
+                var entry = shopStock.Get(i);
+
+                Assert.Greater(entry.price, 0, "항목 " + i + " 의 가격이 0 이하다");
+
+                if (entry.kind == ShopEntryKind.Egg)
+                {
+                    Assert.IsNotNull(eggDb.Find(entry.targetId),
+                        "항목 " + i + " 가 없는 알을 가리킨다: " + entry.targetId);
+                }
+                else
+                {
+                    Assert.IsNotNull(itemDb.Find(entry.targetId),
+                        "항목 " + i + " 가 없는 아이템을 가리킨다: " + entry.targetId);
+                }
+            }
+        }
+
+        [Test]
+        public void ShopStock_SellsEveryEquipmentAndTheEgg()
+        {
+            Assert.AreEqual(4, shopStock.Count, "장비 3종 + 알 1종");
+        }
+
+        [Test]
+        public void Eggs_HaveHatchTargetAndPrefixedId()
+        {
+            Assert.Greater(eggDb.eggs.Count, 0);
+
+            for (int i = 0; i < eggDb.eggs.Count; i++)
+            {
+                var egg = eggDb.eggs[i];
+
+                StringAssert.StartsWith(EggData.IdPrefix, egg.eggId,
+                    "알 id 는 아이템과 같은 인벤토리 키 공간을 쓴다 — 접두어로 갈라 둔다");
+                Assert.IsNotNull(egg.hatchesInto, egg.eggId + " 에서 무엇이 나오는지 정해지지 않았다");
+                Assert.IsNotNull(speciesDb.Find(egg.hatchesInto.speciesId),
+                    "부화 결과가 종 데이터베이스에 없다: " + egg.eggId);
+            }
+        }
+
+        [Test]
+        public void EggIds_DoNotCollideWithItemIds()
+        {
+            for (int i = 0; i < eggDb.eggs.Count; i++)
+            {
+                Assert.IsNull(itemDb.Find(eggDb.eggs[i].eggId),
+                    "알 id 가 아이템 id 와 겹친다 — 인벤토리에서 서로를 덮어쓴다");
+            }
         }
     }
 }
