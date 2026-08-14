@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a556e25f1008d4479c461197c158afe, type: 3}
+  m_Name: EggDatabase
+  m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.EggDatabase
+  eggs:
+  - {fileID: 11400000, guid: d8ed265411753914d88f03628023fcdb, type: 2}

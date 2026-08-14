@@ -25,6 +25,7 @@ namespace FarmCreature.EditorTools
         private const string EnemiesDir = DataRoot + "/Enemies";
         private const string SpritesDir = DataRoot + "/Sprites";
         private const string BattleDir = DataRoot + "/Battle";
+        private const string EggsDir = DataRoot + "/Eggs";
         private const string ScenesDir = "Assets/Scenes";
         private const string FarmScenePath = ScenesDir + "/FarmScene.unity";
         private const string BattleScenePath = ScenesDir + "/BattleScene.unity";
@@ -67,10 +68,15 @@ namespace FarmCreature.EditorTools
             BuildEnemyDatabase(enemies);
             var encounterDb = BuildBattleDataAssets(enemies);
 
+            var eggs = BuildEggAssets(species);
+            var eggDb = BuildEggDatabase(eggs);
+            var shopStock = BuildShopStock();
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            BuildFarmScene(farmScene, speciesDb, itemDb, encounterDb, species["sprigling"], items);
+            BuildFarmScene(farmScene, speciesDb, itemDb, encounterDb, eggDb, shopStock,
+                species["sprigling"], items);
 
             // ★ 두 번째 NewScene 이 위에서 얻은 참조를 '다시' 죽인다 (함정 3.9와 같은 원리).
             // 그래서 전투 씬을 채우기 전에 필요한 것을 경로에서 전부 다시 로드한다.
@@ -130,6 +136,7 @@ namespace FarmCreature.EditorTools
             EnsureFolder(EnemiesDir);
             EnsureFolder(SpritesDir);
             EnsureFolder(BattleDir);
+            EnsureFolder(EggsDir);
             EnsureFolder(ScenesDir);
         }
 
@@ -552,6 +559,48 @@ namespace FarmCreature.EditorTools
             return db;
         }
 
+        /// <summary>
+        /// 알 에셋. <b>seed-only 가 아니다</b> — 코드가 전권을 쥔다 (함정 3.11 은 전투 데이터에만 해당).
+        /// </summary>
+        private static List<EggData> BuildEggAssets(Dictionary<string, CreatureSpeciesData> species)
+        {
+            var egg = LoadOrCreate<EggData>(EggsDir + "/SpriglingEgg.asset");
+            egg.eggId = EggData.IdPrefix + "sprigling";
+            egg.displayName = "스프리글링 알";
+            egg.hatchesInto = species["sprigling"];
+            EditorUtility.SetDirty(egg);
+
+            return new List<EggData> { egg };
+        }
+
+        private static EggDatabase BuildEggDatabase(List<EggData> eggs)
+        {
+            var db = LoadOrCreate<EggDatabase>(DataRoot + "/EggDatabase.asset");
+            db.eggs = new List<EggData>(eggs);
+            EditorUtility.SetDirty(db);
+            return db;
+        }
+
+        /// <summary>
+        /// 상점 판매 목록. <b>상점 패널의 행 개수가 여기서 나온다</b> —
+        /// 항목을 늘리면 BuildAll 을 다시 돌려야 한다 (함정 3.1).
+        ///
+        /// 가격은 초안이다: 들쥐 한 판이 재화 8 이므로 장비가 약 4판, 알이 약 8판이다.
+        /// </summary>
+        private static ShopStockDatabase BuildShopStock()
+        {
+            var db = LoadOrCreate<ShopStockDatabase>(DataRoot + "/ShopStockDatabase.asset");
+            db.entries = new List<ShopEntry>
+            {
+                new ShopEntry { kind = ShopEntryKind.Equipment, targetId = "hearty_feed", price = 30 },
+                new ShopEntry { kind = ShopEntryKind.Equipment, targetId = "iron_grain", price = 30 },
+                new ShopEntry { kind = ShopEntryKind.Equipment, targetId = "bloom_stone", price = 45 },
+                new ShopEntry { kind = ShopEntryKind.Egg, targetId = EggData.IdPrefix + "sprigling", price = 60 }
+            };
+            EditorUtility.SetDirty(db);
+            return db;
+        }
+
         // ---------- 씬 ----------
 
         /// <summary>
@@ -563,6 +612,8 @@ namespace FarmCreature.EditorTools
             SpeciesDatabase speciesDb,
             ItemDatabase itemDb,
             BattleEncounterDatabase encounterDb,
+            EggDatabase eggDb,
+            ShopStockDatabase shopStock,
             CreatureSpeciesData startingSpecies,
             List<ItemData> items)
         {
@@ -599,13 +650,15 @@ namespace FarmCreature.EditorTools
             grass.transform.localScale = new Vector3(FarmArea.HalfWidth * 2f + 8f, 0.4f, 1f);
             grass.transform.position = new Vector3(0f, FarmArea.GroundSurfaceY - 0.2f, 0f);
 
-            // 농장 건물 3동 — 배경에 서 있고 클릭/터치에 반응한다.
+            // 농장 건물 5동 — 배경에 서 있고 클릭/터치에 반응한다.
+            // x 간격 6, 본체 폭 3.4 → 맵 반너비 15 안에 전부 들어온다 (FarmLayoutTests 가 단언).
             var buildings = new List<FarmBuilding>
             {
-                BuildFarmBuilding(BuildingKind.Barn, "헛간", -9f, new Color(0.78f, 0.34f, 0.28f)),
-                BuildFarmBuilding(BuildingKind.Hatchery, "부화소", -3f, new Color(0.85f, 0.76f, 0.45f)),
-                BuildFarmBuilding(BuildingKind.Storage, "창고", 3f, new Color(0.62f, 0.52f, 0.34f)),
-                BuildFarmBuilding(BuildingKind.Shop, "상점", 9f, new Color(0.36f, 0.55f, 0.72f))
+                BuildFarmBuilding(BuildingKind.Barn, "헛간", -12f, new Color(0.78f, 0.34f, 0.28f)),
+                BuildFarmBuilding(BuildingKind.Hatchery, "부화소", -6f, new Color(0.85f, 0.76f, 0.45f)),
+                BuildFarmBuilding(BuildingKind.Storage, "창고", 0f, new Color(0.62f, 0.52f, 0.34f)),
+                BuildFarmBuilding(BuildingKind.Shop, "상점", 6f, new Color(0.36f, 0.55f, 0.72f)),
+                BuildFarmBuilding(BuildingKind.BattleGround, "전투터", 12f, new Color(0.7f, 0.35f, 0.35f))
             };
 
             // 파티 슬롯 — Roster.MaxParty 개를 미리 만들어 두고 PartyField 가 켜고 끈다.
@@ -688,8 +741,12 @@ namespace FarmCreature.EditorTools
             var raisingPanel = BuildRaisingPanel(panelRoot.transform, careManager);
             var barnPanel = BuildBarnPanel(panelRoot.transform, careManager);
             var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, encounterDb);
+            var shopPanel = BuildShopPanel(panelRoot.transform, careManager, shopStock, eggDb);
 
-            careManager.panels = new List<GamePanel> { storagePanel, raisingPanel, barnPanel, battlePanel };
+            careManager.panels = new List<GamePanel>
+            {
+                storagePanel, raisingPanel, barnPanel, battlePanel, shopPanel
+            };
             careManager.raisingPanel = raisingPanel;
             careManager.partyField = partyField;
 
@@ -705,6 +762,9 @@ namespace FarmCreature.EditorTools
                         buildings[i].panel = storagePanel;
                         break;
                     case BuildingKind.Shop:
+                        buildings[i].panel = shopPanel;
+                        break;
+                    case BuildingKind.BattleGround:
                         buildings[i].panel = battlePanel;
                         break;
                 }
@@ -715,6 +775,7 @@ namespace FarmCreature.EditorTools
             raisingPanel.gameObject.SetActive(false);
             barnPanel.gameObject.SetActive(false);
             battlePanel.gameObject.SetActive(false);
+            shopPanel.gameObject.SetActive(false);
 
             // 루트 조립
             var rootGo = new GameObject("GameRoot");
@@ -1041,6 +1102,59 @@ namespace FarmCreature.EditorTools
 
             var closeButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
                 new Vector2(150f, -190f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
+            UnityEventTools.AddVoidPersistentListener(
+                closeButton.onClick, new UnityAction(panel.Close));
+
+            return panel;
+        }
+
+        /// <summary>
+        /// 상점 패널. 행은 <see cref="ShopStockDatabase"/> 인덱스와 1:1 이고,
+        /// [구매] 버튼은 <b>int 인자 persistent listener</b> 로 그 인덱스를 넘긴다 (함정 3.6).
+        /// </summary>
+        private static ShopPanel BuildShopPanel(
+            Transform parent, CareManager careManager, ShopStockDatabase stock, EggDatabase eggDb)
+        {
+            var panelGo = CreatePanelBackground(parent, "ShopPanel", new Vector2(900f, 620f));
+            var panel = panelGo.AddComponent<ShopPanel>();
+            panel.stockDatabase = stock;
+            panel.eggDatabase = eggDb;
+            panel.careManager = careManager;
+
+            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 260f),
+                new Vector2(860f, 50f), TextAnchor.MiddleCenter, 34, Color.white);
+            panel.titleText.text = "상점";
+
+            int rowCount = stock != null ? stock.Count : 0;
+
+            // 0 은 정상 상황이 아니다 — 참조가 죽었다는 뜻이다 (함정 3.9/3.10).
+            if (rowCount == 0)
+            {
+                Debug.LogError("[FarmCreature] 상점 패널: 판매 항목이 0개다. "
+                    + "ShopStockDatabase 참조가 죽었거나 비어 있다. stock==null? " + (stock == null));
+            }
+
+            var rows = new Text[rowCount];
+            float rowY = 160f;
+
+            for (int i = 0; i < rowCount; i++)
+            {
+                rows[i] = CreatePanelText(panelGo.transform, "Row" + i, new Vector2(-150f, rowY),
+                    new Vector2(560f, 50f), TextAnchor.MiddleLeft, 26, Color.white);
+
+                var buyButton = CreatePanelButton(panelGo.transform, "Buy" + i, "구매",
+                    new Vector2(300f, rowY), new Vector2(150f, 54f),
+                    new Color(0.36f, 0.5f, 0.68f));
+                UnityEventTools.AddIntPersistentListener(
+                    buyButton.onClick, new UnityAction<int>(panel.Buy), i);
+
+                rowY -= 80f;
+            }
+
+            panel.rowTexts = rows;
+
+            var closeButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
+                new Vector2(0f, -230f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
             UnityEventTools.AddVoidPersistentListener(
                 closeButton.onClick, new UnityAction(panel.Close));
 

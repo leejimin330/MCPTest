@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6fa103f84eadb6488be4030b990c54f, type: 3}
+  m_Name: ShopStockDatabase
+  m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.ShopStockDatabase
+  entries:
+  - kind: 0
+    targetId: hearty_feed
+    price: 30
+  - kind: 0
+    targetId: iron_grain
+    price: 30
+  - kind: 0
+    targetId: bloom_stone
+    price: 45
+  - kind: 1
+    targetId: egg_sprigling
+    price: 60
