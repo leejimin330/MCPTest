@@ -20,14 +20,69 @@ namespace FarmCreature.EditorTools
     /// </summary>
     public static class SceneIntegrityCheck
     {
-        private const string ScenePath = "Assets/Scenes/FarmScene.unity";
+        private const string FarmScenePath = "Assets/Scenes/FarmScene.unity";
+        private const string BattleScenePath = "Assets/Scenes/BattleScene.unity";
 
         public static void Run()
         {
             var report = new StringBuilder();
             int failures = 0;
 
-            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            failures += CheckBuildSettings(report);
+            failures += CheckFarmScene(report);
+            failures += CheckBattleScene(report);
+
+            if (failures == 0)
+            {
+                report.AppendLine("결과: 통과 — 두 씬의 모든 참조가 유효합니다.");
+                Debug.Log("[SceneIntegrityCheck]\n" + report);
+                EditorApplication.Exit(0);
+            }
+            else
+            {
+                report.AppendLine("결과: 실패 " + failures + "건");
+                Debug.LogError("[SceneIntegrityCheck]\n" + report);
+                EditorApplication.Exit(1);
+            }
+        }
+
+        /// <summary>
+        /// 두 씬이 빌드 설정에 등록됐는가. 빠지면 <c>SceneManager.LoadScene</c> 이
+        /// <b>런타임에</b> 실패한다 — 에디터에서는 멀쩡해 보인다 (설계 5.1).
+        /// </summary>
+        private static int CheckBuildSettings(StringBuilder report)
+        {
+            int failures = 0;
+            var scenes = EditorBuildSettings.scenes;
+
+            failures += RequireSceneRegistered(report, scenes, FarmScenePath);
+            failures += RequireSceneRegistered(report, scenes, BattleScenePath);
+
+            report.AppendLine("빌드 설정 씬 " + scenes.Length + "개 검사");
+            return failures;
+        }
+
+        private static int RequireSceneRegistered(
+            StringBuilder report, EditorBuildSettingsScene[] scenes, string path)
+        {
+            for (int i = 0; i < scenes.Length; i++)
+            {
+                if (scenes[i].path == path && scenes[i].enabled)
+                {
+                    return 0;
+                }
+            }
+
+            report.AppendLine("  [실패] 빌드 설정에 없거나 꺼져 있음: " + path
+                              + " — LoadScene 이 런타임에 실패한다");
+            return 1;
+        }
+
+        private static int CheckFarmScene(StringBuilder report)
+        {
+            int failures = 0;
+
+            var scene = EditorSceneManager.OpenScene(FarmScenePath, OpenSceneMode.Single);
             report.AppendLine("씬 열기: " + scene.path + " (루트 " + scene.rootCount + "개)");
 
             // 1. 모든 SpriteRenderer 가 에셋 스프라이트를 참조하는가
@@ -300,18 +355,140 @@ namespace FarmCreature.EditorTools
                     Roster.MaxMembers, "헛간 줄 버튼 묶음");
             }
 
-            if (failures == 0)
+            return failures;
+        }
+
+        /// <summary>
+        /// 전투 씬은 농장과 다른 것을 단언한다 — 슬롯이 <b>존재하고 꺼져 있는가</b>,
+        /// 체력바 채움이 슬롯마다 있는가, 배속·나가기 버튼이 배선됐는가 (설계 5.2).
+        ///
+        /// 슬롯은 씬에 꺼진 채로 저장되므로 <b>FindObjectsInactive.Include 가 필수</b>다 —
+        /// 빼면 슬롯이 한 개도 검사되지 않는다.
+        /// </summary>
+        private static int CheckBattleScene(StringBuilder report)
+        {
+            int failures = 0;
+
+            var scene = EditorSceneManager.OpenScene(BattleScenePath, OpenSceneMode.Single);
+            report.AppendLine("씬 열기: " + scene.path + " (루트 " + scene.rootCount + "개)");
+
+            // 1. 스프라이트 — 몸통·체력바·바닥 전부 에셋이어야 한다
+            var renderers = Object.FindObjectsByType<SpriteRenderer>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            for (int i = 0; i < renderers.Length; i++)
             {
-                report.AppendLine("결과: 통과 — 저장된 씬의 모든 참조가 유효합니다.");
-                Debug.Log("[SceneIntegrityCheck]\n" + report);
-                EditorApplication.Exit(0);
+                var sprite = renderers[i].sprite;
+
+                if (sprite == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sprite)))
+                {
+                    report.AppendLine("  [실패] 전투 씬: 에셋이 아닌 스프라이트: " + Path(renderers[i].transform));
+                    failures++;
+                }
             }
-            else
+
+            report.AppendLine("전투 씬 SpriteRenderer " + renderers.Length + "개 검사");
+
+            // 2. BattleSceneRoot 배선
+            var root = Object.FindFirstObjectByType<BattleSceneRoot>(FindObjectsInactive.Include);
+            if (root == null)
             {
-                report.AppendLine("결과: 실패 " + failures + "건");
-                Debug.LogError("[SceneIntegrityCheck]\n" + report);
-                EditorApplication.Exit(1);
+                report.AppendLine("  [실패] BattleSceneRoot 없음");
+                return failures + 1;
             }
+
+            failures += RequireRef(report, "battleRoot.ground", root.ground);
+            failures += RequireRef(report, "battleRoot.defaultMap", root.defaultMap);
+            failures += RequireRef(report, "battleRoot.titleText", root.titleText);
+            failures += RequireRef(report, "battleRoot.logText", root.logText);
+            failures += RequireRef(report, "battleRoot.speedText", root.speedText);
+            failures += RequireRef(report, "battleRoot.practiceEncounter", root.practiceEncounter);
+            failures += RequireRef(report, "battleRoot.practiceSpecies", root.practiceSpecies);
+
+            // 3. 슬롯 개수 — 데이터가 아니라 상한으로 고정된다
+            failures += RequireSlots(report, root.allySlots, Roster.MaxParty, "아군 슬롯");
+            failures += RequireSlots(report, root.enemySlots, BattleField.MaxEnemies, "적 슬롯");
+
+            // 4. 버튼 3개(1x · 2x · 나가기)가 리스너를 갖는가
+            var buttons = Object.FindObjectsByType<UnityEngine.UI.Button>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            if (buttons.Length != 3)
+            {
+                report.AppendLine("  [실패] 전투 씬 버튼이 3개가 아님: " + buttons.Length
+                                  + " (1x · 2x · 나가기)");
+                failures++;
+            }
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i].onClick.GetPersistentEventCount() == 0
+                    || string.IsNullOrEmpty(buttons[i].onClick.GetPersistentMethodName(0))
+                    || buttons[i].onClick.GetPersistentTarget(0) == null)
+                {
+                    report.AppendLine("  [실패] 전투 씬: 리스너 없는 버튼: " + Path(buttons[i].transform));
+                    failures++;
+                }
+            }
+
+            report.AppendLine("전투 씬 버튼 " + buttons.Length + "개 검사");
+
+            // 5. 카메라
+            var camera = Object.FindFirstObjectByType<Camera>(FindObjectsInactive.Include);
+            if (camera == null)
+            {
+                report.AppendLine("  [실패] 전투 씬에 카메라가 없음");
+                failures++;
+            }
+
+            return failures;
+        }
+
+        /// <summary>
+        /// 슬롯이 <paramref name="expected"/> 개 있고, 참조가 살아 있고, 조각이 다 붙어 있고,
+        /// <b>저장 시점에 꺼져 있는지</b> 본다. 켜진 채로 저장되면 전투 시작 전부터 유령이 서 있다.
+        /// </summary>
+        private static int RequireSlots(
+            StringBuilder report, System.Collections.Generic.List<BattleUnitView> slots,
+            int expected, string label)
+        {
+            if (slots == null || slots.Count != expected)
+            {
+                report.AppendLine("  [실패] " + label + " 이 " + expected + "개가 아님: "
+                                  + (slots == null ? 0 : slots.Count));
+                return 1;
+            }
+
+            int failures = 0;
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var slot = slots[i];
+
+                if (slot == null)
+                {
+                    report.AppendLine("  [실패] " + label + " " + i + " 참조 끊김");
+                    failures++;
+                    continue;
+                }
+
+                if (slot.body == null || slot.healthBarFill == null
+                    || slot.healthBarBack == null || slot.nameLabel == null)
+                {
+                    report.AppendLine("  [실패] " + label + " " + i + " 의 조각이 빠졌다 "
+                                      + "(body/healthBarBack/healthBarFill/nameLabel)");
+                    failures++;
+                }
+
+                if (slot.gameObject.activeSelf)
+                {
+                    report.AppendLine("  [실패] " + label + " " + i + " 이(가) 켜진 채로 저장됨");
+                    failures++;
+                }
+            }
+
+            report.AppendLine(label + " " + slots.Count + "개 확인");
+            return failures;
         }
 
         /// <summary>패널은 존재하되 <b>꺼진 채로</b> 저장돼야 한다. 켜져 있으면 시작하자마자 떠 있다.</summary>
