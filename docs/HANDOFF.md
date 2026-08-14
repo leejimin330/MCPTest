@@ -4,7 +4,8 @@
 **이 문서:** 지금 상태 / 함정 / 다음 할 것. **재개할 때 이것부터 읽는다.**
 
 > 이전 판(2026-08-06)은 "육성 조작 수단이 화면에 없다 / 창고 UI 가 1순위" 상태였다.
-> 그 뒤 8/13 에 **창고·육성·헛간 패널과 전투**가 전부 들어와 내용이 통째로 바뀌었다.
+> 그 뒤 8/13 에 **창고·육성·헛간 패널과 전투**가 전부 들어왔고,
+> 8/14 에 **전투가 별도 씬으로 나가면서 실제 전투 화면**이 생겨 내용이 또 바뀌었다.
 
 ---
 
@@ -12,11 +13,12 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **122/122 통과** (2026-08-14) |
-| 씬 무결성 검사 | **통과** — 스프라이트 19/19, 버튼 **32/32**, 데이터 기반 버튼 개수 검사 통과 |
-| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · 자동전투 · 저장까지 **한 바퀴 가능** |
-| Play 확인 | **장착 · 전투 · 보상까지 손으로 확인함** (2026-08-14). 나머지는 8절 |
-| git | **저장소 없음.** 커밋 이력 없음 (사용자 보류) |
+| EditMode 테스트 | **148/148 통과** (2026-08-14) |
+| 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
+| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. 농장 버튼 32/32, 전투 버튼 3/3, 슬롯 4+8 |
+| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **전투 씬 자동전투** · 저장까지 **한 바퀴 가능** |
+| Play 확인 | ⚠️ **전투 화면은 아직 손으로 확인하지 않았다.** 8절 참조 |
+| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, 작업 브랜치 `feature/battle-screen` |
 
 > **2026-08-14 에 막힌 버그를 하나 고쳤다.** 그 전까지 씬에는 창고 [장착] 버튼과
 > 전투터 상대 버튼이 **한 개도 없었다** — 즉 장착도 전투도 화면에서 할 수 없었다.
@@ -29,7 +31,8 @@
 | 헛간 (x −9) | ✅ 보유 목록 · 파티 편성 · 육성 대상 선택 |
 | 부화소 (x −3) | ❌ **패널 없음.** "알 시스템 준비 중" 로그만 |
 | 창고 (x +3) | ✅ 장착 / 해제 |
-| 상점 (x +9) | ⚠️ **전투터 패널이 임시로 붙어 있다.** 상점 기능은 없다 |
+| 상점 (x +9) | ⚠️ **전투터 패널이 임시로 붙어 있다.** 인카운터를 고르면 전투 씬으로 간다. 상점 기능은 없다 |
+| 전투 씬 | ✅ 탑뷰 맵 · 유닛 · 체력바 · 로그 · 배속(1x/2x) · 나가기 |
 | 육성 패널 | ✅ 헛간 줄의 `[육성]` 버튼으로 연다 (먹이 · 훈련 3종 · 저장) |
 | 필드 케어 클릭 | ✅ **헛간으로 돌려보낸다** (육성 패널이 아니다) |
 
@@ -77,6 +80,31 @@
 - 맵 반너비 13, 16:9 화면 반너비 8.89 → **드래그/스와이프로 좌우 슬라이드** (관성 + 경계 클램프)
 - 12px 이상 끌면 슬라이드로 간주해 건물/케어 클릭이 발동하지 않음
 - 건물 4동 — **개수가 고정**이다. `SceneIntegrityCheck` 와 `GameRoot.farmBuildings` 가 4를 단언한다
+
+### 2.4 전투 화면 (2026-08-14)
+
+설계 근거는 **`docs/superpowers/specs/2026-08-14-battle-screen-design.md`**,
+구현 계획은 **`docs/superpowers/plans/2026-08-14-battle-screen.md`** 에 있다.
+
+- **별도 전투 씬**이다. 농장에서 인카운터를 고르면 `BattleScene` 으로 넘어가고,
+  [나가기]를 누르면 농장으로 돌아온다.
+- **좌표는 표시 전용이다.** 유닛은 맵의 스폰 영역 안 랜덤 좌표에 서지만
+  `BattleSimulator` 는 좌표를 한 번도 읽지 않는다 — 그래서 **스폰이 랜덤이어도 결과는 결정적**이고,
+  시뮬레이터와 그 테스트 13개는 **한 줄도 바뀌지 않았다.**
+- **배속은 공짜로 얻었다.** 시뮬레이터가 시간을 바깥에서만 받으므로 `Time.deltaTime * speed` 한 줄이다.
+- **`BattleHandoff`** — 순수 C# 정적 전달자가 씬 사이로 상태를 나른다.
+  요청은 `{GameState, BattleEncounter}`, 결과는 `{BattleConclusion, GoldReward, GameState}`.
+  **꺼내면 비워진다** — 안 그러면 농장에 돌아올 때마다 지난 결과가 다시 적용된다.
+- **결과에 `GameState` 를 함께 싣는 이유:** 농장 씬이 다시 로드되면 `GameRoot.Start` 가 처음부터 돈다.
+  거기서 세이브를 읽으면 **저장 버튼을 누르지 않은 진행(먹이·훈련·장착)이 전부 날아간다.**
+  그래서 들려보낸 상태 객체를 그대로 돌려받아 이어 쓴다.
+- **재화가 들어오는 지점은 `GameRoot.ApplyBattleResult` 한 곳뿐이다.** 전투 씬은 액수만 실어 보낸다.
+  씬이 중간에 바뀌어도 이중 지급이 없다.
+- **인카운터** = 표시 이름 + `{적, 마리수}` 목록 + 맵. 적 총원은 `BattleField.MaxEnemies`(8)를 넘을 수 없다.
+- 체력바·이름표는 uGUI 가 아니라 **`SpriteRenderer` / `TextMesh`** 다. 월드 좌표에 uGUI 를 붙이려면
+  World Space Canvas 가 필요한데, 농장이 이미 건물 이름표를 `TextMesh` 로 처리하고 있어 같은 방식을 따랐다.
+  덤으로 무결성 검사 1번(모든 `SpriteRenderer` 가 에셋을 참조하는가)이 체력바까지 덮는다.
+- **전투 씬을 단독으로 Play 하면** 연습 전투(들쥐 떼 + 스프리글링 1마리)로 시작하고 로그로 알린다.
 
 ---
 
@@ -175,6 +203,27 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 **일반화: 개수가 데이터에서 나오는 UI 는 "존재 자체"를 단언해야 한다.**
 루프가 0회 돌아도 예외는 나지 않는다.
 
+### 3.10 `BuildAll` 이 `NewScene` 을 두 번 부른다 ★2026-08-14 에 추가
+
+씬이 둘이 되면서 `NewScene` 도 두 번 불린다. **두 번째 호출이 첫 번째 이후에 얻은
+에셋 참조를 다시 죽인다** (3.9와 같은 원리). 그래서 전투 씬을 채우기 전에
+`ReloadSpriteAssets()` 와 `AssetDatabase.LoadAssetAtPath` 로 필요한 것을 **전부 다시 로드한다.**
+
+이 재로드를 빠뜨리면 슬롯도 버튼도 없는 전투 씬이 **종료 코드 0 으로** 조용히 저장된다.
+
+> 무결성 검사가 이 실패를 실제로 잡는지 확인해 뒀다: 적 슬롯 끄기 루프를 빼고 재생성하면
+> `BuildAll` 은 종료 코드 0 으로 성공하지만 무결성 검사가 8건을 잡아 1 로 실패한다.
+
+### 3.11 전투 데이터는 seed-only 다 — 코드로 초기값을 바꿔도 반영되지 않는다 ★2026-08-14 에 추가
+
+`EnemyData` · `BattleMapData` · `BattleEncounter` · `BattleEncounterDatabase` 는
+`LoadOrSeed` 로 만든다. **이미 있으면 손대지 않는다.** 인스펙터에서 만진 밸런스를
+보존하기 위한 것이지만(설계 2.2), 반대로 `GameBootstrap` 의 초기값을 고쳐도
+**기존 에셋에는 안 들어간다.**
+
+초기값을 다시 깔려면 해당 `.asset` 을 지우고 `BuildAll` 을 돌린다.
+종·아이템·씬은 여전히 `LoadOrCreate` 로 코드가 전권을 쥔다.
+
 ---
 
 ## 4. 알려진 문제 / 결정 대기
@@ -182,6 +231,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 ### 4.1 상점 자리를 전투가 쓰고 있다 ★다음 작업의 걸림돌
 
 전투 전용 건물이 없어 `GameBootstrap` 이 `BuildingKind.Shop` → `BattlePanel` 로 임시 배선했다.
+전투가 별도 씬으로 나갔어도 **진입점은 그대로 상점 건물**이다 — 씬 분리는 이 문제를 풀지 않는다.
 **상점을 만들려면 전투 진입점을 먼저 옮겨야 한다.**
 선택지: 건물 5동으로 늘리기 / 필드 바깥 별도 진입점 / 상점 안에 전투 탭. **미결.**
 
@@ -229,7 +279,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (122개)
+### 5.1 테스트 (148개)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -241,12 +291,17 @@ Unity.exe -batchmode -runTests \
 
 | 픽스처 | 개수 |  | 픽스처 | 개수 |
 |---|---|---|---|---|
-| `CareActionsTests` | 18 | | `PanelLabelsTests` | 17 |
+| `CareActionsTests` | 18 | | `PanelLabelsTests` | 21 |
 | `SaveSerializerTests` | 17 | | `BattleSimulatorTests` | 13 |
 | `EvolutionEvaluatorTests` | 11 | | `GameDataIntegrationTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
 | `GameStateTests` | 8 | | `DataLayerTests` | 5 |
-| `PipelineSmokeTests` | 2 | | **합계** | **122** |
+| `BattleDataTests` | 8 | | `SpawnPointPickerTests` | 7 |
+| `BattleHandoffTests` | 7 | | `PipelineSmokeTests` | 2 |
+| | | | **합계** | **148** |
+
+> `BattleHandoffTests` 는 정적 상태를 쓴다. `SetUp`/`TearDown` 에서 `BattleHandoff.Clear()`
+> 를 부르지 않으면 테스트끼리 서로를 오염시킨다.
 
 ### 5.2 에셋 + 씬 전량 재생성
 
@@ -258,7 +313,7 @@ Unity.exe -batchmode -quit \
 ```
 에디터 안에서는 메뉴 **FarmCreature → Build All**.
 
-### 5.3 씬 무결성 검사 ★씬을 바꿨으면 반드시 실행
+### 5.3 씬 무결성 검사 ★씬을 바꿨으면 반드시 실행 (두 씬을 검사한다)
 
 ```bash
 Unity.exe -batchmode \
@@ -266,9 +321,15 @@ Unity.exe -batchmode \
   -executeMethod FarmCreature.EditorTools.SceneIntegrityCheck.Run \
   -logFile "<경로>\integrity.log"
 ```
-저장된 씬을 **새 프로세스에서 열어** 검사한다: 스프라이트 에셋 참조 / 건물 4동+콜라이더 /
-GameRoot·CareManager 배선 / **패널 4종이 닫혀 있는지** / `battlePanel.enemyDatabase` /
-HUD 텍스트 / 버튼 리스너(**비활성 포함**).
+저장된 씬을 **새 프로세스에서 열어** 검사한다. 세 덩어리다:
+
+1. **빌드 설정** — 두 씬이 등록되고 켜져 있는가. 빠지면 `LoadScene` 이 **런타임에** 실패한다
+2. **농장 씬** — 스프라이트 에셋 참조 / 건물 4동+콜라이더 / GameRoot·CareManager 배선 /
+   **패널 4종이 닫혀 있는지** / `battlePanel.encounterDatabase` / HUD 텍스트 /
+   버튼 리스너(**비활성 포함**) / 데이터 기반 버튼 개수
+3. **전투 씬** — 스프라이트가 전부 에셋인가 / `BattleSceneRoot` 배선 7종 /
+   아군 슬롯 4 · 적 슬롯 8 이 **존재하고 조각이 다 붙어 있고 꺼져 있는지** / 버튼 3개 리스너 / 카메라
+
 통과 = 종료 코드 0, 실패 = 1.
 
 ### 5.4 세이브 파일 위치
@@ -287,35 +348,42 @@ Assets/
   GameData/
     Species/   Sprigling · Wildbeast · BlossomGuardian (.asset)
     Items/     HeartyFeed · IronGrain · BloomStone (.asset)
-    Enemies/   FieldRat · ThornBoar · StoneGolem (.asset)
+    Enemies/   FieldRat · ThornBoar · StoneGolem (.asset)      ← seed-only (함정 3.11)
+    Battle/    FieldMap · RatField · BoarThicket · GolemRidge  ← seed-only (함정 3.11)
     Sprites/   Square.png (8×8) · Circle.png (64×64)   ← 실제 에셋이어야 한다
     SpeciesDatabase.asset · ItemDatabase.asset · EnemyDatabase.asset
+    BattleEncounterDatabase.asset                              ← seed-only
   Scenes/FarmScene.unity            ← 손으로 편집하지 말 것. BuildAll 이 전량 생성
+  Scenes/BattleScene.unity          ← 위와 같음
   Scripts/
     Runtime/
       Data/          StatType · StatBlock · CreatureSpeciesData · ItemData
                      SkillDefinition · EnemyData · EnemyDatabase
                      EvolutionRequirement · EvolutionCondition
                      SpeciesDatabase · ItemDatabase
+                     BattleMapData · BattleEncounter(+EncounterEntry) · BattleEncounterDatabase
       Core/          CreatureInstance · Inventory · ActionResult · CareActions
                      EvolutionEvaluator · Roster · GameState
-                     BattleUnit · BattleSimulator
+                     BattleUnit · BattleSimulator          ← 전투 화면 작업에서 손대지 않았다
+                     SpawnPointPicker · BattleHandoff(+BattleConclusion/Request/Result)
                      SaveData · SaveSerializer
       Presentation/  GameRoot · CareManager · GameHud · UiFontApplier
                      GamePanel(추상) · StoragePanel · RaisingPanel · BarnPanel · BattlePanel
                      PanelLabels · PartyField
                      CreatureController · PlayerController · CameraPanController
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
+                     BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  12개 파일(픽스처 11 + TestFixtures 헬퍼), 테스트 122개
+    Tests/EditMode/  15개 파일(픽스처 14 + TestFixtures 헬퍼), 테스트 148개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
   HANDOFF.md                                          이 문서
   superpowers/specs/2026-08-06-...-design.md          MVP 설계
   superpowers/specs/2026-08-13-building-panels-design.md   창고·육성 패널 설계
   superpowers/specs/2026-08-13-battle-and-roster-design.md 전투·로스터 설계(사후 기록)
-  superpowers/specs/2026-08-14-battle-screen-design.md     전투 화면 설계 ★다음 작업, 미구현
+  superpowers/specs/2026-08-14-battle-screen-design.md     전투 화면 설계 ✅ 구현됨
   superpowers/plans/2026-08-06-...-mvp.md             MVP 구현 계획 + 실행 기록
+  superpowers/plans/2026-08-14-battle-screen.md       전투 화면 구현 계획 + 실행 기록
 ```
 
 **씬을 손으로 편집하지 말 것.** `GameBootstrap.BuildAll()` 이 전부 생성하므로,
@@ -326,23 +394,19 @@ docs/
 ## 7. 다음 할 것
 
 ```
-✅ 전투 (재화 획득)  ──▶  ⬜ 상점 (알·장비 구매)
-                             │
-                             ├──▶  ⬜ 부화소 (알 → 몬스터)
-                             │              │
-                             │              ▼
-                             │         ✅ 헛간
-                             │
-                             └──▶  ✅ 창고
+✅ 전투 + 전투 화면 (재화 획득)  ──▶  ⬜ 상점 (알·장비 구매)
+                                          │
+                                          ├──▶  ⬜ 부화소 (알 → 몬스터)
+                                          │              │
+                                          │              ▼
+                                          │         ✅ 헛간
+                                          │
+                                          └──▶  ✅ 창고
 ```
 
-**0순위 — 전투 화면.** 지금 전투터는 텍스트 두 덩어리뿐이다(진영 목록 + 로그).
-**설계는 끝났다 → `docs/superpowers/specs/2026-08-14-battle-screen-design.md`.
-구현은 시작하지 않았다.** 재개하면 그 문서부터 읽는다.
-
-결정된 것: 별도 전투 씬 · 관전 + 배속(1x/2x)/나가기 · 탑뷰 맵에 옆모습 스프라이트 ·
-적은 설정된 영역의 랜덤 좌표에 스폰 · **위치는 표시 전용**이라 `BattleSimulator` 와
-테스트 13개는 손대지 않는다 · 전투 데이터 에셋은 인스펙터 편집을 보존한다(seed-only).
+**0순위 — 전투 화면 Play 확인.** 구현은 끝났고 자동 검증(테스트 148 · 무결성 검사 2씬)도
+통과했지만, **실제로 눌러 본 적이 없다.** 8절의 전투 화면 항목을 먼저 지운다.
+이 프로젝트는 "테스트·검사 전부 통과인데 게임은 안 되는" 사고를 이미 한 번 겪었다(3.9).
 
 **1순위 — 상점.** 재화가 이미 쌓이므로 경제 순환을 닫는 가장 빠른 길이다.
 단 **4.1(전투 진입점 이동)을 먼저 정해야 한다.** 이건 코드가 아니라 결정의 문제다.
@@ -364,6 +428,7 @@ docs/
 - [x] 창고에서 장착 → 공격 5 → 8, 행 텍스트가 "장착 중 · 여분 2" 로 즉시 갱신
 - [x] 해제 → 공격 8 → 5 로 원복
 - [x] 전투터에서 들쥐 선택 → 3.6초 만에 승리, **재화 8 획득**, 보상 1회만 지급
+  — ⚠️ 이건 **패널 안에서 굴리던 옛 전투**다. 지금은 별도 씬이라 다시 확인해야 한다
 - [x] 장착 보너스가 전투에 실제로 반영됨 (평타 피해 8 = 공격 8 − 방어 1/2)
 - [x] 한글 UI 폰트(맑은 고딕)가 붙고 깨지지 않음
 - [x] 패널 4종이 저장 시점에 닫혀 있고, 열면 뜸
@@ -373,6 +438,22 @@ docs/
 > 배경에서 굴리려면 `Application.runInBackground = true` 를 켜라.
 
 **아직 손으로 확인 안 한 것**
+
+**8/14 전투 화면 — ★0순위. 자동 검증은 전부 통과했으나 눌러 본 적이 없다**
+
+- [ ] 전투터에서 인카운터를 고르면 전투 씬으로 넘어간다
+- [ ] 아군이 왼쪽, 적이 오른쪽에 **겹치지 않게** 서고, 매 전투 배치가 달라진다
+- [ ] 체력바가 실제로 줄어들고, 쓰러진 유닛이 반투명으로 남는다
+- [ ] 유닛 이름이 한글로 보인다 (안 보이면 농장의 건물 이름표도 같은 상태인지 확인 — `TextMesh` 폰트 문제다)
+- [ ] 2x 를 누르면 눈에 띄게 빨라지고, 1x 로 돌아온다
+- [ ] 승리 후 [나가기] → 농장으로 돌아오고 **재화가 한 번만** 들어온다
+- [ ] 전투 중에 [나가기] → 보상 없이 돌아오고 "물러났다" 로그가 뜬다
+- [ ] **전투를 다녀와도 저장 전 진행(먹이·훈련·장착 결과)이 남아 있다** ★ 제일 중요
+- [ ] 파티가 빈 채로 인카운터를 누르면 씬이 바뀌지 않고 안내만 뜬다
+- [ ] `BattleScene` 을 단독으로 Play 하면 연습 전투가 시작되고 로그로 알린다
+
+> `BattleSceneRoot.Start` 가 `Application.runInBackground = true` 를 켜므로
+> 전투 씬은 에디터 창이 비활성이어도 흐른다. 농장 씬은 여전히 영향을 받는다.
 
 **8/06 부터 남아 있던 것**
 
@@ -390,7 +471,6 @@ docs/
 - [ ] 헛간 `[육성]` 으로 대상을 바꾸면 창고·상태 패널이 같은 케어를 가리키는가
 - [ ] 먹이·훈련으로 수치가 즉시 갱신되고, 포만도 부족 시 거부 메시지가 뜨는가
 - [ ] **진화가 실제로 일어나고 필드의 겉모습(색·크기)이 즉시 바뀌는가** — 처음으로 손으로 확인 가능해졌다
-- [ ] 전투가 끝까지 진행되고 로그가 흐르는가
-- [ ] 승리 시 재화가 들어오고 상태 패널에 반영되는가 (보상이 한 번만 들어오는가)
-- [ ] 파티가 빈 채로 전투를 걸면 안내가 뜨는가
 - [ ] 저장 후 재시작하면 보유·파티·육성 대상·재화가 그대로 복원되는가
+
+> 전투 관련 항목은 위의 "8/14 전투 화면" 목록으로 옮겼다 — 전투가 별도 씬이 되면서 확인할 것이 달라졌다.
