@@ -91,5 +91,52 @@ namespace FarmCreature.Tests
             so.items = new List<ItemData>(entries);
             return so;
         }
+
+        /// <summary>전투 맵 픽스처. 기본값은 테스트가 신경 쓰지 않는 값이다.</summary>
+        public static BattleMapData MakeBattleMap(
+            Vector2? allyCenter = null,
+            Vector2? allySize = null,
+            Vector2? enemyCenter = null,
+            Vector2? enemySize = null,
+            float minSpacing = 1.2f)
+        {
+            var so = ScriptableObject.CreateInstance<BattleMapData>();
+            so.displayName = "테스트 맵";
+            so.groundSize = new Vector2(16f, 9f);
+            so.allySpawnCenter = allyCenter ?? new Vector2(-4f, 0f);
+            so.allySpawnSize = allySize ?? new Vector2(5f, 6f);
+            so.enemySpawnCenter = enemyCenter ?? new Vector2(4f, 0f);
+            so.enemySpawnSize = enemySize ?? new Vector2(5f, 6f);
+            so.minSpacing = minSpacing;
+            return so;
+        }
+
+        /// <summary>인카운터 픽스처. (적, 마리수) 쌍을 목록 순서대로 넣는다.</summary>
+        public static BattleEncounter MakeEncounter(
+            string displayName, params (EnemyData enemy, int count)[] entries)
+        {
+            var so = ScriptableObject.CreateInstance<BattleEncounter>();
+            so.displayName = displayName;
+            so.map = MakeBattleMap();
+            so.entries = new List<EncounterEntry>();
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                so.entries.Add(new EncounterEntry
+                {
+                    enemy = entries[i].enemy,
+                    count = entries[i].count
+                });
+            }
+
+            return so;
+        }
+
+        public static BattleEncounterDatabase MakeEncounterDatabase(params BattleEncounter[] entries)
+        {
+            var so = ScriptableObject.CreateInstance<BattleEncounterDatabase>();
+            so.encounters = new List<BattleEncounter>(entries);
+            return so;
+        }
     }
 }
