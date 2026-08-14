@@ -129,12 +129,12 @@ namespace FarmCreature.EditorTools
 
             report.AppendLine("UI Image " + images.Length + "개 검사");
 
-            // 3. 건물 4동과 콜라이더
+            // 3. 건물 5동과 콜라이더
             var buildings = Object.FindObjectsByType<FarmBuilding>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
-            if (buildings.Length != 4)
+            if (buildings.Length != 5)
             {
-                report.AppendLine("  [실패] 건물이 4동이 아님: " + buildings.Length);
+                report.AppendLine("  [실패] 건물이 5동이 아님: " + buildings.Length);
                 failures++;
             }
 
@@ -151,20 +151,32 @@ namespace FarmCreature.EditorTools
                 {
                     buildingsWithPanel++;
                 }
+
+                // 건물 x 좌표가 맵 밖으로 나갔는지. FarmLayoutTests 는 GameBootstrap 이
+                // Editor 어셈블리라 좌표를 테스트 안에 복제해서 검사한다 — 좌표 자체가
+                // 바뀌어도 복제본은 못 잡는다. 실제 배치는 여기서만 볼 수 있다.
+                float edge = Mathf.Abs(buildings[i].transform.position.x) + 1.7f;
+                if (edge > FarmArea.HalfWidth)
+                {
+                    report.AppendLine("  [실패] 건물이 맵 밖으로 나감: " + buildings[i].displayName
+                                      + " x=" + buildings[i].transform.position.x);
+                    failures++;
+                }
             }
 
-            // 헛간 / 창고 / 상점 셋만 패널이 있고, 부화소는 아직 없다.
-            if (buildingsWithPanel != 3)
+            // 헛간 / 창고 / 상점 / 전투터 넷이 패널을 갖고, 부화소는 아직 없다.
+            if (buildingsWithPanel != 4)
             {
-                report.AppendLine("  [실패] 패널이 연결된 건물이 3동이 아님: " + buildingsWithPanel);
+                report.AppendLine("  [실패] 패널이 연결된 건물이 4동이 아님: " + buildingsWithPanel);
                 failures++;
             }
 
-            // 4. 패널 4종 — 저장 시점에는 전부 꺼져 있어야 한다
+            // 4. 패널 5종 — 저장 시점에는 전부 꺼져 있어야 한다
             failures += RequirePanelClosed<BarnPanel>(report, "헛간 패널");
             failures += RequirePanelClosed<StoragePanel>(report, "창고 패널");
             failures += RequirePanelClosed<RaisingPanel>(report, "육성 패널");
             failures += RequirePanelClosed<BattlePanel>(report, "전투 패널");
+            failures += RequirePanelClosed<ShopPanel>(report, "상점 패널");
 
             // 5. GameRoot 배선
             var root = Object.FindFirstObjectByType<GameRoot>(FindObjectsInactive.Include);
@@ -182,9 +194,9 @@ namespace FarmCreature.EditorTools
                 failures += RequireRef(report, "hud", root.hud);
                 failures += RequireRef(report, "partyField", root.partyField);
 
-                if (root.farmBuildings == null || root.farmBuildings.Count != 4)
+                if (root.farmBuildings == null || root.farmBuildings.Count != 5)
                 {
-                    report.AppendLine("  [실패] GameRoot.farmBuildings 가 4개가 아님");
+                    report.AppendLine("  [실패] GameRoot.farmBuildings 가 5개가 아님");
                     failures++;
                 }
             }
@@ -202,9 +214,9 @@ namespace FarmCreature.EditorTools
                 failures += RequireRef(report, "careManager.raisingPanel", care.raisingPanel);
                 failures += RequireRef(report, "careManager.partyField", care.partyField);
 
-                if (care.panels == null || care.panels.Count != 4)
+                if (care.panels == null || care.panels.Count != 5)
                 {
-                    report.AppendLine("  [실패] CareManager.panels 가 4개가 아님: "
+                    report.AppendLine("  [실패] CareManager.panels 가 5개가 아님: "
                                       + (care.panels == null ? 0 : care.panels.Count));
                     failures++;
                 }
@@ -258,6 +270,64 @@ namespace FarmCreature.EditorTools
                 failures += RequireRef(report, "battlePanel.careManager", battle.careManager);
                 failures += RequireRef(report, "battlePanel.titleText", battle.titleText);
                 failures += RequireRef(report, "battlePanel.infoText", battle.infoText);
+            }
+
+            // 8-1. 상점 패널 배선 ★
+            var shop = Object.FindFirstObjectByType<ShopPanel>(FindObjectsInactive.Include);
+            if (shop == null)
+            {
+                report.AppendLine("  [실패] ShopPanel 없음");
+                failures++;
+            }
+            else
+            {
+                failures += RequireRef(report, "shopPanel.stockDatabase", shop.stockDatabase);
+                failures += RequireRef(report, "shopPanel.eggDatabase", shop.eggDatabase);
+                failures += RequireRef(report, "shopPanel.careManager", shop.careManager);
+                failures += RequireRef(report, "shopPanel.titleText", shop.titleText);
+            }
+
+            // 8-2. 건물 종류가 다섯 가지 전부 한 번씩 나오는가.
+            // 개수만 세면 같은 종류가 두 번 서 있어도 통과한다.
+            var kinds = new System.Collections.Generic.HashSet<BuildingKind>();
+            for (int i = 0; i < buildings.Length; i++)
+            {
+                kinds.Add(buildings[i].kind);
+            }
+
+            var requiredKinds = new[]
+            {
+                BuildingKind.Barn, BuildingKind.Hatchery, BuildingKind.Storage,
+                BuildingKind.Shop, BuildingKind.BattleGround
+            };
+
+            for (int i = 0; i < requiredKinds.Length; i++)
+            {
+                if (!kinds.Contains(requiredKinds[i]))
+                {
+                    report.AppendLine("  [실패] 건물 종류가 빠졌음: " + requiredKinds[i]);
+                    failures++;
+                }
+            }
+
+            // 8-3. 전투 진입점이 전투터로 옮겨졌는가 (설계 4.1 — 상점 건물이 열던 것을 뗐다)
+            for (int i = 0; i < buildings.Length; i++)
+            {
+                if (buildings[i].kind == BuildingKind.Shop
+                    && buildings[i].panel != null && !(buildings[i].panel is ShopPanel))
+                {
+                    report.AppendLine("  [실패] 상점 건물이 상점 패널을 열지 않는다: "
+                                      + buildings[i].panel.GetType().Name);
+                    failures++;
+                }
+
+                if (buildings[i].kind == BuildingKind.BattleGround
+                    && buildings[i].panel != null && !(buildings[i].panel is BattlePanel))
+                {
+                    report.AppendLine("  [실패] 전투터 건물이 전투 패널을 열지 않는다: "
+                                      + buildings[i].panel.GetType().Name);
+                    failures++;
+                }
             }
 
             // 9. HUD 텍스트 배선
@@ -345,6 +415,28 @@ namespace FarmCreature.EditorTools
                 // 자리는 6칸(3×2)뿐이라 인카운터가 더 많아도 버튼은 6개까지만 만든다.
                 int expected = encounters < 6 ? encounters : 6;
                 failures += RequireNamedChildren(report, battle.transform, "Encounter", expected, "전투터 인카운터 버튼");
+            }
+
+            // 상점 — 행 개수가 재고 목록에서 나온다. 0 이면 참조가 죽은 것이다 (함정 3.9/3.10).
+            if (shop != null && shop.stockDatabase != null)
+            {
+                int expected = shop.stockDatabase.Count;
+
+                if (expected == 0)
+                {
+                    report.AppendLine("  [실패] ShopStockDatabase 가 비어 있음 — 살 수 있는 것이 없다");
+                    failures++;
+                }
+
+                failures += RequireNamedChildren(report, shop.transform, "Buy", expected, "상점 [구매] 버튼");
+                failures += RequireNamedChildren(report, shop.transform, "Row", expected, "상점 판매 행");
+
+                int rowTexts = shop.rowTexts == null ? 0 : shop.rowTexts.Length;
+                if (rowTexts != expected)
+                {
+                    report.AppendLine("  [실패] shopPanel.rowTexts 가 " + expected + "개가 아님: " + rowTexts);
+                    failures++;
+                }
             }
 
             // 헛간은 데이터가 아니라 상한으로 줄 수가 고정된다.
