@@ -64,13 +64,13 @@ namespace FarmCreature.EditorTools
             var enemies = BuildEnemyAssets();
             var speciesDb = BuildSpeciesDatabase(species);
             var itemDb = BuildItemDatabase(items);
-            var enemyDb = BuildEnemyDatabase(enemies);
-            BuildBattleDataAssets(enemies);
+            BuildEnemyDatabase(enemies);
+            var encounterDb = BuildBattleDataAssets(enemies);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            BuildScene(scene, speciesDb, itemDb, enemyDb, species["sprigling"], items);
+            BuildScene(scene, speciesDb, itemDb, encounterDb, species["sprigling"], items);
 
             Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬을 생성했습니다: " + FarmScenePath);
         }
@@ -517,7 +517,7 @@ namespace FarmCreature.EditorTools
             UnityEngine.SceneManagement.Scene scene,
             SpeciesDatabase speciesDb,
             ItemDatabase itemDb,
-            EnemyDatabase enemyDb,
+            BattleEncounterDatabase encounterDb,
             CreatureSpeciesData startingSpecies,
             List<ItemData> items)
         {
@@ -642,7 +642,7 @@ namespace FarmCreature.EditorTools
             var storagePanel = BuildStoragePanel(panelRoot.transform, careManager, itemDb);
             var raisingPanel = BuildRaisingPanel(panelRoot.transform, careManager);
             var barnPanel = BuildBarnPanel(panelRoot.transform, careManager);
-            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, enemyDb);
+            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, encounterDb);
 
             careManager.panels = new List<GamePanel> { storagePanel, raisingPanel, barnPanel, battlePanel };
             careManager.raisingPanel = raisingPanel;
@@ -923,54 +923,62 @@ namespace FarmCreature.EditorTools
         }
 
         /// <summary>
-        /// 전투터 패널(상점 건물). 상대 버튼은 <see cref="EnemyDatabase"/> 인덱스를 넘긴다.
-        /// 전투 진행은 <see cref="BattlePanel"/> 의 Update 가 굴린다.
+        /// 전투터 패널(상점 건물에 임시로 붙어 있다 — HANDOFF 4.1).
+        /// 인카운터 버튼은 <see cref="BattleEncounterDatabase"/> 인덱스를 넘기고,
+        /// 전투 자체는 <see cref="BattleSceneRoot"/> 가 별도 씬에서 굴린다.
         /// </summary>
         private static BattlePanel BuildBattlePanel(
-            Transform parent, CareManager careManager, EnemyDatabase enemyDb)
+            Transform parent, CareManager careManager, BattleEncounterDatabase encounterDb)
         {
-            var panelGo = CreatePanelBackground(parent, "BattlePanel", new Vector2(1100f, 760f));
+            var panelGo = CreatePanelBackground(parent, "BattlePanel", new Vector2(1100f, 620f));
             var panel = panelGo.AddComponent<BattlePanel>();
-            panel.enemyDatabase = enemyDb;
+            panel.encounterDatabase = encounterDb;
             panel.careManager = careManager;
 
-            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 320f),
+            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 250f),
                 new Vector2(1040f, 50f), TextAnchor.MiddleCenter, 34, Color.white);
             panel.titleText.text = "전투터";
 
-            panel.rosterText = CreatePanelText(panelGo.transform, "Roster", new Vector2(-270f, 70f),
-                new Vector2(480f, 420f), TextAnchor.UpperLeft, 24, Color.white);
+            panel.infoText = CreatePanelText(panelGo.transform, "Info", new Vector2(0f, 175f),
+                new Vector2(1040f, 44f), TextAnchor.MiddleCenter, 26, new Color(0.85f, 0.85f, 0.7f));
 
-            panel.logText = CreatePanelText(panelGo.transform, "BattleLog", new Vector2(270f, 70f),
-                new Vector2(480f, 420f), TextAnchor.UpperLeft, 22, new Color(0.85f, 0.85f, 0.7f));
+            int encounterCount = encounterDb != null ? encounterDb.Count : 0;
 
-            int enemyCount = enemyDb != null && enemyDb.enemies != null ? enemyDb.enemies.Count : 0;
-
-            // 0 이면 전투를 시작할 수단이 없는 전투터가 저장된다. 창고와 같은 이유로 크게 실패시킨다.
-            if (enemyCount == 0)
+            // 0 이면 전투를 시작할 수단이 없는 전투터가 저장된다 (함정 3.9의 일반화).
+            if (encounterCount == 0)
             {
-                Debug.LogError("[FarmCreature] 전투 패널: 상대가 0명이다. "
-                    + "EnemyDatabase 참조가 죽었거나(NewScene 이후 로드했는지 확인) 데이터베이스가 비어 있다. "
-                    + "enemyDb==null? " + (enemyDb == null));
+                Debug.LogError("[FarmCreature] 전투 패널: 인카운터가 0개다. "
+                    + "BattleEncounterDatabase 참조가 죽었거나(NewScene 이후 로드했는지 확인) 목록이 비어 있다. "
+                    + "encounterDb==null? " + (encounterDb == null));
             }
 
-            var slotX = new[] { -350f, 0f, 350f };
+            // 한 줄에 3칸, 최대 2줄. 그 이상은 자리가 없다.
+            const int columns = 3;
+            const int maxButtons = columns * 2;
 
-            for (int i = 0; i < enemyCount && i < slotX.Length; i++)
+            if (encounterCount > maxButtons)
             {
-                string label = enemyDb.enemies[i] != null
-                    ? enemyDb.enemies[i].displayName
-                    : "상대 " + i;
+                Debug.LogError("[FarmCreature] 인카운터가 " + encounterCount + "개다. "
+                    + "전투터에는 " + maxButtons + "칸뿐이라 나머지는 화면에서 고를 수 없다. "
+                    + "패널 레이아웃을 늘리거나 인카운터를 줄일 것.");
+            }
 
-                var enemyButton = CreatePanelButton(panelGo.transform, "Enemy" + i, label,
-                    new Vector2(slotX[i], -205f), new Vector2(300f, 76f),
+            for (int i = 0; i < encounterCount && i < maxButtons; i++)
+            {
+                var encounter = encounterDb.Get(i);
+
+                var button = CreatePanelButton(panelGo.transform, "Encounter" + i,
+                    PanelLabels.EncounterButton(encounter),
+                    new Vector2(-350f + (i % columns) * 350f, 30f - (i / columns) * 120f),
+                    new Vector2(320f, 100f),
                     new Color(0.68f, 0.36f, 0.34f));
+
                 UnityEventTools.AddIntPersistentListener(
-                    enemyButton.onClick, new UnityAction<int>(panel.StartBattle), i);
+                    button.onClick, new UnityAction<int>(panel.StartEncounter), i);
             }
 
             var closeButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
-                new Vector2(0f, -305f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
+                new Vector2(0f, -240f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
             UnityEventTools.AddVoidPersistentListener(
                 closeButton.onClick, new UnityAction(panel.Close));
 

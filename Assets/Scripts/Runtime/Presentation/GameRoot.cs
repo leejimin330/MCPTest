@@ -30,22 +30,35 @@ namespace FarmCreature.Presentation
         private void Start()
         {
             GameState state;
-            string error;
             string message;
 
-            if (SaveSystem.TryLoad(speciesDatabase, itemDatabase, out state, out error))
+            // 전투에서 돌아왔는가? 세이브를 다시 읽으면 저장 전 진행(먹이·훈련·장착)이 날아가므로,
+            // 전투에 들려보냈던 상태를 그대로 이어받는다.
+            var battleResult = BattleHandoff.TakeResult();
+
+            if (battleResult != null && battleResult.State != null)
             {
-                message = "이어서 돌보는 중.";
+                state = battleResult.State;
+                message = ApplyBattleResult(state, battleResult);
             }
             else
             {
-                if (!string.IsNullOrEmpty(error))
-                {
-                    Debug.LogWarning("[FarmCreature] 세이브를 불러오지 못해 새로 시작합니다: " + error);
-                }
+                string error;
 
-                state = BuildNewGame();
-                message = "새로운 케어들을 맞이했다.";
+                if (SaveSystem.TryLoad(speciesDatabase, itemDatabase, out state, out error))
+                {
+                    message = "이어서 돌보는 중.";
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        Debug.LogWarning("[FarmCreature] 세이브를 불러오지 못해 새로 시작합니다: " + error);
+                    }
+
+                    state = BuildNewGame();
+                    message = "새로운 케어들을 맞이했다.";
+                }
             }
 
             if (hud != null)
@@ -65,6 +78,26 @@ namespace FarmCreature.Presentation
                 {
                     farmBuildings[i].Bind(hud);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 전투 보상을 지급한다. <b>재화가 들어오는 지점은 여기 하나뿐이다</b> —
+        /// 전투 씬은 액수만 실어 보낸다. 씬이 중간에 바뀌어도 이중 지급이 없다 (설계 3.3).
+        /// </summary>
+        private static string ApplyBattleResult(GameState state, BattleResult result)
+        {
+            switch (result.Conclusion)
+            {
+                case BattleConclusion.Victory:
+                    state.AddGold(result.GoldReward);
+                    return "승리했다! 재화 " + result.GoldReward + " 획득.";
+
+                case BattleConclusion.Defeat:
+                    return "패배했다. 케어는 다치지 않는다 — 더 키워서 다시 오자.";
+
+                default:
+                    return "전투에서 물러났다.";
             }
         }
 

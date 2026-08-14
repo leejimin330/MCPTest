@@ -195,12 +195,14 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            // 8. 전투 패널의 적 데이터베이스
+            // 8. 전투터 패널의 인카운터 데이터베이스
             var battle = Object.FindFirstObjectByType<BattlePanel>(FindObjectsInactive.Include);
             if (battle != null)
             {
-                failures += RequireRef(report, "battlePanel.enemyDatabase", battle.enemyDatabase);
+                failures += RequireRef(report, "battlePanel.encounterDatabase", battle.encounterDatabase);
                 failures += RequireRef(report, "battlePanel.careManager", battle.careManager);
+                failures += RequireRef(report, "battlePanel.titleText", battle.titleText);
+                failures += RequireRef(report, "battlePanel.infoText", battle.infoText);
             }
 
             // 9. HUD 텍스트 배선
@@ -275,19 +277,19 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            if (battle != null && battle.enemyDatabase != null)
+            if (battle != null && battle.encounterDatabase != null)
             {
-                int enemies = battle.enemyDatabase.enemies != null ? battle.enemyDatabase.enemies.Count : 0;
+                int encounters = battle.encounterDatabase.Count;
 
-                if (enemies == 0)
+                if (encounters == 0)
                 {
-                    report.AppendLine("  [실패] EnemyDatabase 가 비어 있음 — 전투를 시작할 수단이 없다");
+                    report.AppendLine("  [실패] BattleEncounterDatabase 가 비어 있음 — 전투를 시작할 수단이 없다");
                     failures++;
                 }
 
-                // 자리는 3칸뿐이라 상대가 더 많아도 버튼은 3개까지만 만든다.
-                int expected = enemies < 3 ? enemies : 3;
-                failures += RequireNamedChildren(report, battle.transform, "Enemy", expected, "전투터 상대 버튼");
+                // 자리는 6칸(3×2)뿐이라 인카운터가 더 많아도 버튼은 6개까지만 만든다.
+                int expected = encounters < 6 ? encounters : 6;
+                failures += RequireNamedChildren(report, battle.transform, "Encounter", expected, "전투터 인카운터 버튼");
             }
 
             // 헛간은 데이터가 아니라 상한으로 줄 수가 고정된다.

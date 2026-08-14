@@ -1,151 +1,73 @@
-using System.Text;
 using FarmCreature.Core;
 using FarmCreature.Data;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace FarmCreature.Presentation
 {
     /// <summary>
-    /// 전투터 — 상대를 고르면 <b>지금 밖에 나와 있는 파티가 그대로</b> 출전해 자동전투한다.
+    /// 전투터 — 어디로 나갈지 고르는 곳이다. <b>전투 자체는 여기서 굴리지 않는다</b>:
+    /// 인카운터를 골라 <see cref="BattleHandoff"/> 에 실은 뒤 전투 씬을 연다 (설계 3절).
     ///
-    /// 규칙은 전부 <see cref="BattleSimulator"/> 안에 있고 이 클래스는 시간만 흘려보낸다.
-    /// 그래서 전투 결과는 프레임률과 무관하게 재현된다.
+    /// 이전 판에서는 이 패널이 <see cref="BattleSimulator"/> 를 직접 굴리고 재화까지 지급했다.
+    /// 그 역할은 각각 <see cref="BattleSceneRoot"/> 와 <see cref="GameRoot"/> 로 옮겼다.
     /// </summary>
     public class BattlePanel : GamePanel
     {
-        [Tooltip("전투 로그에서 화면에 남길 줄 수.")]
-        public int visibleLogLines = 8;
+        public const string BattleSceneName = "BattleScene";
 
         public Text titleText;
-        public Text rosterText;
-        public Text logText;
+        public Text infoText;
 
-        public EnemyDatabase enemyDatabase;
+        [Tooltip("버튼 개수가 이 목록에서 나온다. GameBootstrap 이 채운다.")]
+        public BattleEncounterDatabase encounterDatabase;
 
-        /// <summary>보상 정산과 로그를 맡길 조율자. GameBootstrap 이 채운다.</summary>
+        [Tooltip("안내 로그를 맡길 조율자. GameBootstrap 이 채운다.")]
         public CareManager careManager;
 
-        private BattleSimulator battle;
-        private readonly StringBuilder builder = new StringBuilder();
-
-        /// <summary>전투가 끝난 뒤 보상을 한 번만 주기 위한 표시.</summary>
-        private bool rewardGranted;
-
-        public BattleSimulator Current
-        {
-            get { return battle; }
-        }
-
         /// <summary>
-        /// uGUI 버튼이 <see cref="EnemyDatabase"/> 인덱스를 넘긴다.
-        /// 파티가 비어 있으면 시뮬레이터가 시작하자마자 패배로 끝내므로 여기서 따로 막지 않는다.
+        /// uGUI 버튼이 <see cref="BattleEncounterDatabase"/> 인덱스를 넘긴다 (함정 3.6).
+        ///
+        /// 파티가 비었으면 <b>씬을 바꾸기 전에</b> 막는다. 예전에는 시뮬레이터가 시작하자마자
+        /// 패배로 끝내도록 뒀지만, 이제는 그 대가가 씬 전환 왕복이라 그냥 두면 안 된다.
         /// </summary>
-        public void StartBattle(int enemyIndex)
+        public void StartEncounter(int encounterIndex)
         {
-            if (state == null || enemyDatabase == null
-                || enemyIndex < 0 || enemyIndex >= enemyDatabase.enemies.Count)
+            if (state == null || encounterDatabase == null)
             {
-                Log("상대를 찾을 수 없다.");
+                Log("전투터를 열 수 없다.");
                 return;
             }
 
-            var enemy = enemyDatabase.enemies[enemyIndex];
-            if (enemy == null)
+            var encounter = encounterDatabase.Get(encounterIndex);
+            if (encounter == null)
             {
-                Log("상대를 찾을 수 없다.");
+                Log("갈 곳을 찾을 수 없다.");
                 return;
             }
 
-            var party = new System.Collections.Generic.List<CreatureInstance>(state.Roster.Party);
-            battle = new BattleSimulator(party, new[] { enemy });
-            rewardGranted = false;
-
-            Log(party.Count > 0
-                ? enemy.displayName + "와(과)의 전투를 시작했다."
-                : "밖에 나와 있는 케어가 없다. 헛간에서 먼저 내보내자.");
-
-            Refresh();
-        }
-
-        private void Update()
-        {
-            if (!IsOpen || battle == null || battle.Outcome != BattleOutcome.InProgress)
+            if (state.Roster.Party.Count == 0)
             {
+                Log("밖에 나와 있는 케어가 없다. 헛간에서 먼저 내보내자.");
                 return;
             }
 
-            battle.Tick(Time.deltaTime);
-
-            if (battle.Outcome != BattleOutcome.InProgress)
-            {
-                GrantReward();
-            }
-
-            Refresh();
-        }
-
-        private void GrantReward()
-        {
-            if (rewardGranted)
-            {
-                return;
-            }
-
-            rewardGranted = true;
-
-            if (battle.Outcome == BattleOutcome.Victory && battle.GoldReward > 0)
-            {
-                state.AddGold(battle.GoldReward);
-                Log("승리! 재화 " + battle.GoldReward + " 획득.");
-            }
-            else if (battle.Outcome == BattleOutcome.Defeat)
-            {
-                Log("파티가 전멸했다. 케어는 다치지 않는다 — 더 키워서 다시 오자.");
-            }
-
-            // 재화가 바뀌었으니 상태 패널도 다시 그린다.
-            if (careManager != null)
-            {
-                careManager.RefreshAll();
-            }
+            BattleHandoff.SetRequest(state, encounter);
+            SceneManager.LoadScene(BattleSceneName);
         }
 
         public override void Refresh()
         {
             if (titleText != null)
             {
-                titleText.text = PanelLabels.BattleTitle(battle);
+                titleText.text = "전투터";
             }
 
-            // 진영 목록은 전투 씬의 유닛과 체력바가 대신한다 (Task 6 에서 이 패널을 통째로 갈아치운다).
-            if (logText != null)
+            if (infoText != null)
             {
-                logText.text = TailOfLog();
+                infoText.text = PanelLabels.BattleReadyLine(state);
             }
-        }
-
-        private string TailOfLog()
-        {
-            if (battle == null)
-            {
-                return string.Empty;
-            }
-
-            var lines = battle.Log;
-            int start = lines.Count - visibleLogLines;
-            if (start < 0)
-            {
-                start = 0;
-            }
-
-            builder.Length = 0;
-            for (int i = start; i < lines.Count; i++)
-            {
-                builder.AppendLine(lines[i]);
-            }
-
-            return builder.ToString();
         }
 
         private void Log(string message)
