@@ -24,8 +24,10 @@ namespace FarmCreature.EditorTools
         private const string ItemsDir = DataRoot + "/Items";
         private const string EnemiesDir = DataRoot + "/Enemies";
         private const string SpritesDir = DataRoot + "/Sprites";
+        private const string BattleDir = DataRoot + "/Battle";
         private const string ScenesDir = "Assets/Scenes";
-        private const string ScenePath = ScenesDir + "/FarmScene.unity";
+        private const string FarmScenePath = ScenesDir + "/FarmScene.unity";
+        private const string BattleScenePath = ScenesDir + "/BattleScene.unity";
 
         // 씬에 직렬화되려면 스프라이트가 '에셋'이어야 한다.
         // 코드로 만든 런타임 Sprite 는 저장되지 않아 씬을 다시 열면 전부 사라진다.
@@ -63,13 +65,14 @@ namespace FarmCreature.EditorTools
             var speciesDb = BuildSpeciesDatabase(species);
             var itemDb = BuildItemDatabase(items);
             var enemyDb = BuildEnemyDatabase(enemies);
+            BuildBattleDataAssets(enemies);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
             BuildScene(scene, speciesDb, itemDb, enemyDb, species["sprigling"], items);
 
-            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬을 생성했습니다: " + ScenePath);
+            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬을 생성했습니다: " + FarmScenePath);
         }
 
         // ---------- 폴더 ----------
@@ -81,6 +84,7 @@ namespace FarmCreature.EditorTools
             EnsureFolder(ItemsDir);
             EnsureFolder(EnemiesDir);
             EnsureFolder(SpritesDir);
+            EnsureFolder(BattleDir);
             EnsureFolder(ScenesDir);
         }
 
@@ -176,6 +180,32 @@ namespace FarmCreature.EditorTools
             var created = ScriptableObject.CreateInstance<T>();
             AssetDatabase.CreateAsset(created, assetPath);
             return created;
+        }
+
+        /// <summary>
+        /// 없으면 만들어 초기값을 넣고, <b>이미 있으면 손대지 않는다.</b>
+        /// <paramref name="created"/> 가 <c>true</c> 면 이번에 새로 만든 것이라 초기값을 채워야 한다.
+        ///
+        /// <b>전투 데이터에만 쓴다</b> — 손으로 밸런스를 만지는 대상이 전투뿐이기 때문이다.
+        /// 종·아이템·씬은 지금처럼 <see cref="LoadOrCreate{T}"/> 로 코드가 전권을 쥔다.
+        /// 전면 seed-only 로 바꾸면 "씬과 에셋은 언제든 재생성 가능해야 한다"(PRD N5)가 약해진다 (설계 2.2).
+        ///
+        /// <b>대가:</b> 초기값을 코드에서 바꿔도 기존 에셋에는 반영되지 않는다.
+        /// 다시 깔려면 해당 .asset 을 지우고 BuildAll 을 돌린다.
+        /// </summary>
+        private static T LoadOrSeed<T>(string assetPath, out bool created) where T : ScriptableObject
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+            if (existing != null)
+            {
+                created = false;
+                return existing;
+            }
+
+            var seeded = ScriptableObject.CreateInstance<T>();
+            AssetDatabase.CreateAsset(seeded, assetPath);
+            created = true;
+            return seeded;
         }
 
         private static Dictionary<string, CreatureSpeciesData> BuildSpeciesAssets()
@@ -292,47 +322,160 @@ namespace FarmCreature.EditorTools
         }
 
         /// <summary>
-        /// 전투터의 상대 3종. 수치는 초안이다 —
-        /// 스프리글링(공5 방5 체20) 한 마리로는 들쥐를 간신히 잡고, 가시멧돼지부터는
-        /// 파티를 늘리거나 훈련·장비가 필요하도록 잡았다.
+        /// 전투터의 상대 3종. <b>seed-only</b> 다 — 이미 있으면 인스펙터에서 만진 값을 그대로 둔다 (설계 2.2).
+        ///
+        /// 수치는 초안이다: 스프리글링(공5 방5 체20) 한 마리로는 들쥐를 간신히 잡고,
+        /// 가시멧돼지부터는 파티를 늘리거나 훈련·장비가 필요하도록 잡았다.
         /// </summary>
         private static List<EnemyData> BuildEnemyAssets()
         {
-            var rat = LoadOrCreate<EnemyData>(EnemiesDir + "/FieldRat.asset");
-            rat.enemyId = "field_rat";
-            rat.displayName = "들쥐";
-            rat.maxHp = 24;
-            rat.attack = 4;
-            rat.defense = 1;
-            rat.attackInterval = 1.8f;
-            rat.goldReward = 8;
-            rat.placeholderColor = new Color(0.72f, 0.66f, 0.55f);
+            bool created;
 
-            var boar = LoadOrCreate<EnemyData>(EnemiesDir + "/ThornBoar.asset");
-            boar.enemyId = "thorn_boar";
-            boar.displayName = "가시멧돼지";
-            boar.maxHp = 45;
-            boar.attack = 7;
-            boar.defense = 3;
-            boar.attackInterval = 1.5f;
-            boar.goldReward = 18;
-            boar.placeholderColor = new Color(0.65f, 0.4f, 0.3f);
+            var rat = LoadOrSeed<EnemyData>(EnemiesDir + "/FieldRat.asset", out created);
+            if (created)
+            {
+                rat.enemyId = "field_rat";
+                rat.displayName = "들쥐";
+                rat.maxHp = 24;
+                rat.attack = 4;
+                rat.defense = 1;
+                rat.attackInterval = 1.8f;
+                rat.goldReward = 8;
+                rat.placeholderColor = new Color(0.72f, 0.66f, 0.55f);
+                EditorUtility.SetDirty(rat);
+            }
 
-            var golem = LoadOrCreate<EnemyData>(EnemiesDir + "/StoneGolem.asset");
-            golem.enemyId = "stone_golem";
-            golem.displayName = "바위골렘";
-            golem.maxHp = 80;
-            golem.attack = 10;
-            golem.defense = 6;
-            golem.attackInterval = 1.9f;
-            golem.goldReward = 40;
-            golem.placeholderColor = new Color(0.5f, 0.5f, 0.55f);
+            var boar = LoadOrSeed<EnemyData>(EnemiesDir + "/ThornBoar.asset", out created);
+            if (created)
+            {
+                boar.enemyId = "thorn_boar";
+                boar.displayName = "가시멧돼지";
+                boar.maxHp = 45;
+                boar.attack = 7;
+                boar.defense = 3;
+                boar.attackInterval = 1.5f;
+                boar.goldReward = 18;
+                boar.placeholderColor = new Color(0.65f, 0.4f, 0.3f);
+                EditorUtility.SetDirty(boar);
+            }
 
-            EditorUtility.SetDirty(rat);
-            EditorUtility.SetDirty(boar);
-            EditorUtility.SetDirty(golem);
+            var golem = LoadOrSeed<EnemyData>(EnemiesDir + "/StoneGolem.asset", out created);
+            if (created)
+            {
+                golem.enemyId = "stone_golem";
+                golem.displayName = "바위골렘";
+                golem.maxHp = 80;
+                golem.attack = 10;
+                golem.defense = 6;
+                golem.attackInterval = 1.9f;
+                golem.goldReward = 40;
+                golem.placeholderColor = new Color(0.5f, 0.5f, 0.55f);
+                EditorUtility.SetDirty(golem);
+            }
 
             return new List<EnemyData> { rat, boar, golem };
+        }
+
+        /// <summary>
+        /// 전투 맵과 인카운터를 <b>seed-only</b> 로 깐다 (설계 2.2).
+        /// 맵은 하나(들판)만 만든다 — 맵이 늘어나면 인카운터에서 골라 쓰면 된다 (설계 8.4).
+        /// </summary>
+        private static BattleEncounterDatabase BuildBattleDataAssets(List<EnemyData> enemies)
+        {
+            bool created;
+
+            var fieldMap = LoadOrSeed<BattleMapData>(BattleDir + "/FieldMap.asset", out created);
+            if (created)
+            {
+                fieldMap.displayName = "들판";
+                fieldMap.groundSize = new Vector2(17f, 9f);
+                fieldMap.groundColor = new Color(0.45f, 0.62f, 0.35f);
+                fieldMap.allySpawnCenter = new Vector2(-4.5f, -0.5f);
+                fieldMap.allySpawnSize = new Vector2(5f, 5.5f);
+                fieldMap.enemySpawnCenter = new Vector2(4.5f, -0.5f);
+                fieldMap.enemySpawnSize = new Vector2(5f, 5.5f);
+                fieldMap.minSpacing = 1.4f;
+                EditorUtility.SetDirty(fieldMap);
+            }
+
+            // 적 3종을 그대로 세 판으로 나눈다. 마리 수로 난이도를 벌린다 —
+            // 들쥐는 떼로, 골렘은 한 마리로. 총원은 BattleField.MaxEnemies 를 넘지 않는다.
+            var ratField = SeedEncounter(BattleDir + "/RatField.asset",
+                "들판 — 들쥐 떼", fieldMap, enemies[0], 3);
+            var boarThicket = SeedEncounter(BattleDir + "/BoarThicket.asset",
+                "덤불 — 가시멧돼지", fieldMap, enemies[1], 2);
+            var golemRidge = SeedEncounter(BattleDir + "/GolemRidge.asset",
+                "바위 언덕 — 바위골렘", fieldMap, enemies[2], 1);
+
+            var db = LoadOrSeed<BattleEncounterDatabase>(
+                DataRoot + "/BattleEncounterDatabase.asset", out created);
+            if (created)
+            {
+                db.encounters = new List<BattleEncounter> { ratField, boarThicket, golemRidge };
+                EditorUtility.SetDirty(db);
+            }
+
+            ValidateEncounters(db);
+            return db;
+        }
+
+        private static BattleEncounter SeedEncounter(
+            string assetPath, string displayName, BattleMapData map, EnemyData enemy, int count)
+        {
+            bool created;
+            var encounter = LoadOrSeed<BattleEncounter>(assetPath, out created);
+
+            if (created)
+            {
+                encounter.displayName = displayName;
+                encounter.map = map;
+                encounter.entries = new List<EncounterEntry>
+                {
+                    new EncounterEntry { enemy = enemy, count = count }
+                };
+                EditorUtility.SetDirty(encounter);
+            }
+
+            return encounter;
+        }
+
+        /// <summary>
+        /// 인카운터의 적 총원이 씬 슬롯 수를 넘으면 <b>크게 실패시킨다.</b>
+        /// 조용히 잘라내면 인스펙터에 8마리 넘게 적어놓고 왜 안 나오는지 모르게 된다 (설계 4.3).
+        /// </summary>
+        private static void ValidateEncounters(BattleEncounterDatabase db)
+        {
+            if (db == null || db.Count == 0)
+            {
+                Debug.LogError("[FarmCreature] 인카운터가 0개다. 전투터에 버튼이 하나도 생기지 않는다. "
+                    + "BattleEncounterDatabase 참조가 죽었는지(NewScene 이후 로드했는지) 확인할 것. "
+                    + "db==null? " + (db == null));
+                return;
+            }
+
+            for (int i = 0; i < db.Count; i++)
+            {
+                var encounter = db.Get(i);
+                if (encounter == null)
+                {
+                    Debug.LogError("[FarmCreature] 인카운터 " + i + " 번이 비어 있다.");
+                    continue;
+                }
+
+                if (encounter.TotalEnemyCount > BattleField.MaxEnemies)
+                {
+                    Debug.LogError("[FarmCreature] 인카운터 '" + encounter.displayName + "' 의 적이 "
+                        + encounter.TotalEnemyCount + "마리다. 슬롯은 "
+                        + BattleField.MaxEnemies + "개뿐이다. "
+                        + "적을 줄이거나 BattleField.MaxEnemies 를 올리고 BuildAll 을 다시 돌릴 것.");
+                }
+
+                if (encounter.TotalEnemyCount == 0)
+                {
+                    Debug.LogError("[FarmCreature] 인카운터 '" + encounter.displayName
+                        + "' 에 적이 없다. 눌러도 아무 일도 일어나지 않는다.");
+                }
+            }
         }
 
         private static EnemyDatabase BuildEnemyDatabase(List<EnemyData> enemies)
@@ -542,9 +685,9 @@ namespace FarmCreature.EditorTools
             root.farmBuildings = buildings;
 
             EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene, ScenePath);
+            EditorSceneManager.SaveScene(scene, FarmScenePath);
 
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(FarmScenePath, true) };
         }
 
         /// <summary>
