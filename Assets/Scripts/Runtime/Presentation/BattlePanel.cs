@@ -118,11 +118,7 @@ namespace FarmCreature.Presentation
                 titleText.text = PanelLabels.BattleTitle(battle);
             }
 
-            if (rosterText != null)
-            {
-                rosterText.text = PanelLabels.BattleRoster(battle);
-            }
-
+            // 진영 목록은 전투 씬의 유닛과 체력바가 대신한다 (Task 6 에서 이 패널을 통째로 갈아치운다).
             if (logText != null)
             {
                 logText.text = TailOfLog();

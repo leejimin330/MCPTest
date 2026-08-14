@@ -167,49 +167,40 @@ namespace FarmCreature.Presentation
             }
         }
 
-        /// <summary>양쪽 진영의 체력을 한 덩어리로. 죽은 유닛은 이름만 남긴다.</summary>
-        public static string BattleRoster(BattleSimulator battle)
+        /// <summary>
+        /// 전투터 버튼 한 칸. 몇 마리와 붙고 얼마를 버는지 들어가기 전에 보여준다.
+        ///
+        /// 예전에는 적 한 마리가 곧 한 판이라 <c>EnemyButton</c> 이었지만,
+        /// 전투가 인카운터 단위가 되면서 여러 마리를 한 줄로 요약한다.
+        /// </summary>
+        public static string EncounterButton(BattleEncounter encounter)
         {
-            if (battle == null)
-            {
-                return "상대를 고르면 파티가 그대로 출전한다.";
-            }
-
-            var builder = new System.Text.StringBuilder();
-            builder.AppendLine("[파티]");
-            AppendSide(builder, battle.Allies);
-            builder.AppendLine();
-            builder.AppendLine("[상대]");
-            AppendSide(builder, battle.Enemies);
-
-            return builder.ToString();
-        }
-
-        private static void AppendSide(System.Text.StringBuilder builder, System.Collections.Generic.IReadOnlyList<BattleUnit> units)
-        {
-            if (units == null || units.Count == 0)
-            {
-                builder.AppendLine("  (없음)");
-                return;
-            }
-
-            for (int i = 0; i < units.Count; i++)
-            {
-                var unit = units[i];
-                builder.AppendLine(unit.IsAlive
-                    ? "  " + unit.Name + "  " + unit.Hp + "/" + unit.MaxHp
-                    : "  " + unit.Name + "  쓰러짐");
-            }
-        }
-
-        public static string EnemyButton(EnemyData enemy)
-        {
-            if (enemy == null)
+            if (encounter == null)
             {
                 return "(없음)";
             }
 
-            return enemy.displayName + "\n재화 " + enemy.goldReward;
+            return encounter.displayName
+                   + "\n적 " + encounter.TotalEnemyCount
+                   + " · 재화 " + encounter.TotalGoldReward;
+        }
+
+        /// <summary>전투터를 열었을 때의 안내 한 줄. 파티가 비어 있으면 어디서 내보내는지 알려준다.</summary>
+        public static string BattleReadyLine(GameState state)
+        {
+            if (state == null || state.Roster.Party.Count == 0)
+            {
+                return "밖에 나와 있는 케어가 없다. 헛간에서 먼저 내보내자.";
+            }
+
+            return "출전 " + state.Roster.Party.Count + "/" + Roster.MaxParty
+                   + "   " + GoldLine(state.Gold);
+        }
+
+        /// <summary>전투 화면의 배속 표시. 1x / 2x 두 단계뿐이다 (설계 8.3).</summary>
+        public static string SpeedLabel(float speed)
+        {
+            return "배속 " + (speed >= 2f ? "2x" : "1x");
         }
 
         public static string GoldLine(int gold)

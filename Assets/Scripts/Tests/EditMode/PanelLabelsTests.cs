@@ -174,25 +174,51 @@ namespace FarmCreature.Tests
         }
 
         [Test]
-        public void BattleRoster_ShowsBothSidesWithHealth()
+        public void EncounterButton_ShowsNameCountAndReward()
         {
-            var hero = TestFixtures.MakeFighter("hero", attack: 1, defense: 0, health: 30,
-                attackInterval: 9999f, cooldownSeconds: 9999f);
-            var foe = TestFixtures.MakeEnemy("foe", maxHp: 40, attack: 0, defense: 0,
-                attackInterval: 9999f, displayName: "들쥐");
+            var rat = TestFixtures.MakeEnemy("rat", maxHp: 10, attack: 1, defense: 0, goldReward: 8);
+            var encounter = TestFixtures.MakeEncounter("들판 — 들쥐 떼", (rat, 3));
 
-            var party = new System.Collections.Generic.List<CreatureInstance>
-            {
-                CreatureInstance.CreateNew(hero)
-            };
+            string label = PanelLabels.EncounterButton(encounter);
 
-            string text = PanelLabels.BattleRoster(new BattleSimulator(party, new[] { foe }));
+            StringAssert.Contains("들판 — 들쥐 떼", label);
+            StringAssert.Contains("3", label, "몇 마리와 붙는지 모르고 들어가면 안 된다");
+            StringAssert.Contains("24", label, "보상 합계 8×3");
+        }
 
-            StringAssert.Contains("[파티]", text);
-            StringAssert.Contains("[상대]", text);
-            StringAssert.Contains("30/30", text);
-            StringAssert.Contains("40/40", text);
-            StringAssert.Contains("들쥐", text);
+        [Test]
+        public void EncounterButton_HandlesMissingEncounter()
+        {
+            Assert.AreEqual("(없음)", PanelLabels.EncounterButton(null));
+        }
+
+        [Test]
+        public void BattleReadyLine_WarnsWhenNobodyIsOut()
+        {
+            var state = new GameState(new Roster(), new Inventory(), 0);
+
+            StringAssert.Contains("헛간", PanelLabels.BattleReadyLine(state),
+                "파티가 비었으면 어디서 내보내는지 알려줘야 한다");
+        }
+
+        [Test]
+        public void BattleReadyLine_ShowsPartySizeAndGold()
+        {
+            var roster = new Roster();
+            roster.Add(CreatureInstance.CreateNew(species));
+            roster.JoinParty(roster.GetMember(0));
+
+            string line = PanelLabels.BattleReadyLine(new GameState(roster, new Inventory(), 120));
+
+            StringAssert.Contains("1/" + Roster.MaxParty, line);
+            StringAssert.Contains("120", line);
+        }
+
+        [Test]
+        public void SpeedLabel_ShowsTheMultiplier()
+        {
+            StringAssert.Contains("1x", PanelLabels.SpeedLabel(1f));
+            StringAssert.Contains("2x", PanelLabels.SpeedLabel(2f));
         }
 
         [Test]
