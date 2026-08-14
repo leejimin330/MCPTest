@@ -203,6 +203,38 @@ namespace FarmCreature.Presentation
             return "배속 " + (speed >= 2f ? "2x" : "1x");
         }
 
+        // ---------- 상점 ----------
+
+        public static string ShopTitle(GameState state)
+        {
+            return state != null ? "상점   " + GoldLine(state.Gold) : "상점";
+        }
+
+        /// <summary>장비 한 줄. 창고와 달리 <b>가격</b>이 붙고, 장착 여부는 보이지 않는다.</summary>
+        public static string ShopRow(ItemData item, int price, int owned)
+        {
+            if (item == null)
+            {
+                return "(빈 칸)";
+            }
+
+            return item.displayName
+                   + "   " + CareActions.StatName(item.targetStat) + " +" + item.amount
+                   + "   " + price + "G"
+                   + "   보유 " + owned;
+        }
+
+        /// <summary>알 한 줄. 알은 스탯이 없으므로 이름·가격·보유 수만 보인다.</summary>
+        public static string ShopRow(EggData egg, int price, int owned)
+        {
+            if (egg == null)
+            {
+                return "(빈 칸)";
+            }
+
+            return egg.displayName + "   " + price + "G   보유 " + owned;
+        }
+
         public static string GoldLine(int gold)
         {
             return "재화 " + gold;

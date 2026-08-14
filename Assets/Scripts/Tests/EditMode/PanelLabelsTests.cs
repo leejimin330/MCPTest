@@ -232,5 +232,56 @@ namespace FarmCreature.Tests
         {
             Assert.AreEqual("???", PanelLabels.CreatureName(null));
         }
+
+        // ---------- 상점 ----------
+
+        [Test]
+        public void ShopTitle_ShowsGold()
+        {
+            var roster = new Roster();
+            roster.Add(CreatureInstance.CreateNew(TestFixtures.MakeSpecies("sprigling")));
+            var state = new GameState(roster, new Inventory(), 128);
+
+            StringAssert.Contains("상점", PanelLabels.ShopTitle(state));
+            StringAssert.Contains("128", PanelLabels.ShopTitle(state));
+        }
+
+        [Test]
+        public void ShopTitle_WithoutState_StillReadable()
+        {
+            Assert.AreEqual("상점", PanelLabels.ShopTitle(null));
+        }
+
+        [Test]
+        public void ShopRow_Equipment_ShowsBonusPriceAndOwned()
+        {
+            var item = TestFixtures.MakeItem("hearty_feed", StatType.Attack, 3, "무쇠 발톱");
+
+            string row = PanelLabels.ShopRow(item, 30, 2);
+
+            StringAssert.Contains("무쇠 발톱", row);
+            StringAssert.Contains("+3", row);
+            StringAssert.Contains("30G", row);
+            StringAssert.Contains("보유 2", row);
+        }
+
+        [Test]
+        public void ShopRow_Egg_ShowsPriceAndOwned()
+        {
+            var egg = TestFixtures.MakeEgg("egg_sprigling", "스프리글링 알");
+
+            string row = PanelLabels.ShopRow(egg, 60, 0);
+
+            StringAssert.Contains("스프리글링 알", row);
+            StringAssert.Contains("60G", row);
+            StringAssert.Contains("보유 0", row);
+        }
+
+        [Test]
+        public void ShopRow_NullTarget_IsEmptySlot()
+        {
+            Assert.AreEqual("(빈 칸)", PanelLabels.ShopRow((ItemData)null, 30, 0));
+            Assert.AreEqual("(빈 칸)", PanelLabels.ShopRow((EggData)null, 60, 0));
+        }
     }
 }
