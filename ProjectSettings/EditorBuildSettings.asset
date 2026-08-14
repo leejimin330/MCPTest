@@ -8,5 +8,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/FarmScene.unity
     guid: b19b0f55faa65354abb4e66474ce19c2
+  - enabled: 1
+    path: Assets/Scenes/BattleScene.unity
+    guid: 9274d28b04a2f2940aae38dec0b2460d
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
