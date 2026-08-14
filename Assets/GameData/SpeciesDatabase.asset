@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b5960abe6c52da408a778b684434297, type: 3}
+  m_Name: SpeciesDatabase
+  m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.SpeciesDatabase
+  species:
+  - {fileID: 11400000, guid: 5be6ded272f16c844a6205bb8b72b175, type: 2}
+  - {fileID: 11400000, guid: ac099761e8f03b142995400e96fde9bd, type: 2}
+  - {fileID: 11400000, guid: 69901ab4e1acc6747a059c7ed4991b1b, type: 2}

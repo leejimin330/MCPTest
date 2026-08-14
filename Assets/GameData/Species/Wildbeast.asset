@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0516b867da7da634eb8f5377957c480b, type: 3}
+  m_Name: Wildbeast
+  m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.CreatureSpeciesData
+  speciesId: wildbeast
+  displayName: "\uC640\uC77C\uB4DC\uBE44\uC2A4\uD2B8"
+  baseStats:
+    attack: 15
+    defense: 8
+    health: 30
+  placeholderColor: {r: 0.95, g: 0.55, b: 0.2, a: 1}
+  placeholderScale: 1.5
+  skill:
+    displayName: "\uC57C\uC131\uC758 \uB3CC\uC9C4"
+    effect: 0
+    cooldownSeconds: 6
+    multiplier: 2.6
+  attackInterval: 1
+  evolutions: []
