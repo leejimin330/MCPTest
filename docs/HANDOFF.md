@@ -1,11 +1,13 @@
-# 작업 인수인계 — 2026-08-14
+# 작업 인수인계 — 2026-08-15
 
 **프로젝트:** `C:\Users\이지민\UnityProjects\MCPTest` (Unity 6000.2.8f1, 2D)
 **이 문서:** 지금 상태 / 함정 / 다음 할 것. **재개할 때 이것부터 읽는다.**
 
 > 이전 판(2026-08-06)은 "육성 조작 수단이 화면에 없다 / 창고 UI 가 1순위" 상태였다.
 > 그 뒤 8/13 에 **창고·육성·헛간 패널과 전투**가 전부 들어왔고,
-> 8/14 에 **전투가 별도 씬으로 나가면서 실제 전투 화면**이 생겨 내용이 또 바뀌었다.
+> 8/14 에 **전투가 별도 씬으로 나가면서 실제 전투 화면**이 생겼고,
+> 8/15 에 **상점이 들어오면서 건물이 4동 → 5동**(전투터 신설)이 되고
+> 전투 진입점이 상점 건물에서 전투터 건물로 옮겨져 내용이 또 바뀌었다.
 
 ---
 
@@ -13,13 +15,13 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **148/148 통과** (2026-08-14) |
-| PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절) |
+| EditMode 테스트 | **175/175 통과** (2026-08-15, 148 + 상점 27) |
+| PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절). 맵 폭이 15로 늘어도 영향 없었다 |
 | 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
-| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. 농장 버튼 32/32, 전투 버튼 3/3, 슬롯 4+8 |
-| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **전투 씬 자동전투** · 저장까지 **한 바퀴 가능** |
+| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동**, 패널 5종 닫힘, 상점 행·버튼 개수 = 재고 4, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel), 건물 x 좌표가 맵 안 |
+| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **전투 씬 자동전투** · **상점 구매**(장비·알) · 저장까지 **한 바퀴 가능** |
 | Play 확인 | ⚠️ **눈으로는 아직 안 봤다.** 동작은 PlayMode 테스트가 덮고, 보기 좋은가는 8절 |
-| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, 작업 브랜치 `feature/battle-screen` |
+| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, 작업 브랜치 `feature/shop` |
 
 > **2026-08-14 에 막힌 버그를 하나 고쳤다.** 그 전까지 씬에는 창고 [장착] 버튼과
 > 전투터 상대 버튼이 **한 개도 없었다** — 즉 장착도 전투도 화면에서 할 수 없었다.
@@ -29,10 +31,11 @@
 
 | 건물 / 진입점 | 상태 |
 |---|---|
-| 헛간 (x −9) | ✅ 보유 목록 · 파티 편성 · 육성 대상 선택 |
-| 부화소 (x −3) | ❌ **패널 없음.** "알 시스템 준비 중" 로그만 |
-| 창고 (x +3) | ✅ 장착 / 해제 |
-| 상점 (x +9) | ⚠️ **전투터 패널이 임시로 붙어 있다.** 인카운터를 고르면 전투 씬으로 간다. 상점 기능은 없다 |
+| 헛간 (x −12) | ✅ 보유 목록 · 파티 편성 · 육성 대상 선택 |
+| 부화소 (x −6) | ❌ **패널 없음.** "알 시스템 준비 중" 로그만 |
+| 창고 (x 0) | ✅ 장착 / 해제 |
+| 상점 (x +6) | ✅ **`ShopPanel`.** 장비 3종(무쇠 발톱 30 / 돌 껍질 30 / 블룸 스톤 45) + 스프리글링 알(60) 구매. 재고 무한, 되팔기 없음 |
+| 전투터 (x +12) | ✅ **신설.** 인카운터를 고르면 전투 씬으로 간다 (4.1 해소 — 상점 건물에서 옮겨왔다) |
 | 전투 씬 | ✅ 탑뷰 맵 · 유닛 · 체력바 · 로그 · 배속(1x/2x) · 나가기 |
 | 육성 패널 | ✅ 헛간 줄의 `[육성]` 버튼으로 연다 (먹이 · 훈련 3종 · 저장) |
 | 필드 케어 클릭 | ✅ **헛간으로 돌려보낸다** (육성 패널이 아니다) |
@@ -78,9 +81,11 @@
 ### 2.3 화면 (측면 뷰)
 
 - 땅 윗면(`y = −2.0`) 위에서 **좌우로만** 이동. 플레이어 A/D·←/→, 파티원은 자동 배회
-- 맵 반너비 13, 16:9 화면 반너비 8.89 → **드래그/스와이프로 좌우 슬라이드** (관성 + 경계 클램프)
+- 맵 반너비 **15**(2026-08-15 에 13에서 늘림), 16:9 화면 반너비 8.89
+  → **드래그/스와이프로 좌우 슬라이드** (관성 + 경계 클램프)
 - 12px 이상 끌면 슬라이드로 간주해 건물/케어 클릭이 발동하지 않음
-- 건물 4동 — **개수가 고정**이다. `SceneIntegrityCheck` 와 `GameRoot.farmBuildings` 가 4를 단언한다
+- 건물 **5동**(2026-08-15 에 전투터 신설로 4동에서 늘림) — **개수가 고정**이다.
+  `SceneIntegrityCheck` 와 `GameRoot.farmBuildings` 가 5를 단언한다
 
 ### 2.4 전투 화면 (2026-08-14)
 
@@ -229,23 +234,32 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 
 ## 4. 알려진 문제 / 결정 대기
 
-### 4.1 상점 자리를 전투가 쓰고 있다 ★다음 작업의 걸림돌
+### 4.1 상점 자리를 전투가 쓰고 있다 — **해결됨 (2026-08-15)**
 
-전투 전용 건물이 없어 `GameBootstrap` 이 `BuildingKind.Shop` → `BattlePanel` 로 임시 배선했다.
-전투가 별도 씬으로 나갔어도 **진입점은 그대로 상점 건물**이다 — 씬 분리는 이 문제를 풀지 않는다.
-**상점을 만들려면 전투 진입점을 먼저 옮겨야 한다.**
-선택지: 건물 5동으로 늘리기 / 필드 바깥 별도 진입점 / 상점 안에 전투 탭. **미결.**
+건물을 4동 → **5동**으로 늘려 전투 전용 건물(전투터, x +12)을 새로 세웠다.
+`GameBootstrap` 의 배선이 `BuildingKind.Shop` → `ShopPanel`, `BuildingKind.BattleGround` → `BattlePanel`
+로 바뀌었다. `SceneIntegrityCheck` 8-3 이 이 배선을 직접 단언한다(상점 건물이 `ShopPanel` 이 아니면,
+전투터 건물이 `BattlePanel` 이 아니면 실패).
 
-건물을 5동으로 늘리는 쪽은 `SceneIntegrityCheck` 의 "4동" 단언, `GameRoot.farmBuildings`,
-건물 x 좌표 배치(−9/−3/+3/+9)를 함께 건드린다.
+건물 x 좌표는 −12(헛간) / −6(부화소) / 0(창고) / +6(상점) / +12(전투터)로 바뀌었고,
+`FarmArea.HalfWidth` 는 13 → **15**로 늘었다.
 
-### 4.2 재화에 쓸 곳이 없다
+### 4.2 재화에 쓸 곳이 없다 — **해결됨 (2026-08-15)**
 
-`Gold` 는 전투로 쌓이기만 한다. `TrySpendGold` 를 부르는 곳이 없어 바깥 루프가 닫히지 않는다.
+상점에서 장비 3종과 알을 살 수 있게 됐다. 구매 규칙은 `ShopService.TryBuy` 한 곳에 있다 —
+`GameState.TrySpendGold` 로 차감을 먼저 시도하고, 모자라면 **아무것도 바뀌지 않는다**
+(절반만 적용된 상태가 생기지 않는다). 가격이 0 이하인 항목은 데이터 실수로 보고 거부한다.
 
-### 4.3 알을 어디서 얻을지 미정
+### 4.3 알을 어디서 얻을지 미정 — **결정됨: 상점 구매 (2026-08-15)**
 
-부화소 착수의 선행 조건이다. 상점 구매 / 전투 드랍 / 둘 다 — **미결.**
+`EggData`/`EggDatabase` 라는 **`ItemData` 와 별개 계통**으로 만들었다 — 창고 행이
+`ItemDatabase` 인덱스와 1:1 로 묶여 있어서, 알을 아이템과 같은 계통에 넣으면 창고에 알 행이
+생겨버리기 때문이다. 산 알은 인벤토리에 `egg_sprigling` 키로 쌓이지만 **창고에는 안 나타난다.**
+
+세이브 포맷은 **v3 그대로다** — 인벤토리가 문자열 키 기반이라 알 항목이 추가돼도 포맷을 안 바꿔도 된다.
+
+**남은 것은 부화소다.** 알을 깨서 몬스터를 얻는 기능은 아직 없다 — 산 알은 지금은 인벤토리에
+쌓이기만 한다. 7절 참고.
 
 ### 4.4 밸런스 — 장비가 진화 속도에 영향을 못 준다
 
@@ -261,13 +275,11 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 
 `공격 − 방어/2`(최소 1)는 적 3종에 맞춘 값일 뿐 검증된 곡선이 아니다. 상대가 늘면 다시 볼 것.
 
-### 4.6 파티원 초기 배치가 맵 밖으로 계산된다 (사소)
+### 4.6 파티원 초기 배치가 맵 밖으로 계산된다 — **해결됨 (2026-08-15)**
 
-`PartyField.SpawnX` 가 `HalfWidth * 1.4`(= 18.2)까지 펼치는데 맵 반너비는 13 이다.
-바깥쪽 두 명은 `FarmArea.OnGround` 의 클램프에 걸려 **맵 가장자리에 붙어 선다**.
-게다가 `PlaceAt` 이 클램프 전 좌표를 목표로 잡아, 도착 판정이 서지 않고 재탐색 타이머가
-돌 때까지 잠깐 멈춰 있는다. 곧 정상 배회로 넘어가므로 눈에 잘 띄지는 않는다.
-고치려면 `usable` 을 `HalfWidth` 안쪽으로 잡고 `PlaceAt` 에서 클램프된 값을 목표로 쓰면 된다.
+`PartyField.SpawnX` 가 예전에는 `HalfWidth * 1.4` 로 맵 바깥을 목표로 잡아, 바깥쪽 파티원이
+클램프에 걸려 가장자리에 붙어 서고 도착 판정도 안 서던 문제였다. 이제 **맵 안쪽**
+(`FarmArea.HalfWidth − 2`)을 목표로 잡도록 고쳤다. 맵을 15로 넓히면서 함께 손봤다.
 
 ### 4.7 git 저장소 없음
 
@@ -280,7 +292,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (148개)
+### 5.1 테스트 (175개, 2026-08-15)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -292,14 +304,19 @@ Unity.exe -batchmode -runTests \
 
 | 픽스처 | 개수 |  | 픽스처 | 개수 |
 |---|---|---|---|---|
-| `CareActionsTests` | 18 | | `PanelLabelsTests` | 21 |
-| `SaveSerializerTests` | 17 | | `BattleSimulatorTests` | 13 |
-| `EvolutionEvaluatorTests` | 11 | | `GameDataIntegrationTests` | 11 |
+| `CareActionsTests` | 18 | | `PanelLabelsTests` | 26 |
+| `SaveSerializerTests` | 18 | | `BattleSimulatorTests` | 13 |
+| `GameDataIntegrationTests` | 15 | | `EvolutionEvaluatorTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
-| `GameStateTests` | 8 | | `DataLayerTests` | 5 |
-| `BattleDataTests` | 8 | | `SpawnPointPickerTests` | 7 |
-| `BattleHandoffTests` | 7 | | `PipelineSmokeTests` | 2 |
-| | | | **합계** | **148** |
+| `GameStateTests` | 8 | | `BattleDataTests` | 8 |
+| `SpawnPointPickerTests` | 7 | | `BattleHandoffTests` | 7 |
+| `ShopDataTests` | 6 | | `ShopServiceTests` | 6 |
+| `DataLayerTests` | 5 | | `FarmLayoutTests` | 5 |
+| `PipelineSmokeTests` | 2 | | **합계** | **175** |
+
+> `ShopDataTests`(6) · `ShopServiceTests`(6) · `FarmLayoutTests`(5) 가 8/15 상점 작업에서 새로 생겼다.
+> `PanelLabelsTests`(21→26) · `GameDataIntegrationTests`(11→15) · `SaveSerializerTests`(17→18) 도
+> 같은 작업에서 늘었다. 148 + 27 = 175.
 
 > `BattleHandoffTests` 는 정적 상태를 쓴다. `SetUp`/`TearDown` 에서 `BattleHandoff.Clear()`
 > 를 부르지 않으면 테스트끼리 서로를 오염시킨다.
@@ -325,9 +342,12 @@ Unity.exe -batchmode \
 저장된 씬을 **새 프로세스에서 열어** 검사한다. 세 덩어리다:
 
 1. **빌드 설정** — 두 씬이 등록되고 켜져 있는가. 빠지면 `LoadScene` 이 **런타임에** 실패한다
-2. **농장 씬** — 스프라이트 에셋 참조 / 건물 4동+콜라이더 / GameRoot·CareManager 배선 /
-   **패널 4종이 닫혀 있는지** / `battlePanel.encounterDatabase` / HUD 텍스트 /
-   버튼 리스너(**비활성 포함**) / 데이터 기반 버튼 개수
+2. **농장 씬** — 스프라이트 에셋 참조 / **건물 5동**+콜라이더 / GameRoot·CareManager 배선 /
+   **패널 5종(헛간·창고·육성·전투·상점)이 닫혀 있는지** / `battlePanel.encounterDatabase` /
+   **`shopPanel.stockDatabase`·`shopPanel.eggDatabase` 배선** / HUD 텍스트 /
+   버튼 리스너(**비활성 포함**) / 데이터 기반 버튼 개수(**상점 [구매] 버튼·판매 행 개수 = `ShopStockDatabase.Count`**) /
+   **건물 종류 5종이 한 번씩 다 있는가** / **진입점 배선**(상점 건물 → `ShopPanel`, 전투터 건물 → `BattlePanel`) /
+   **건물 x 좌표가 맵(`FarmArea.HalfWidth`=15) 밖으로 안 나갔는가**
 3. **전투 씬** — 스프라이트가 전부 에셋인가 / `BattleSceneRoot` 배선 7종 /
    아군 슬롯 4 · 적 슬롯 8 이 **존재하고 조각이 다 붙어 있고 꺼져 있는지** / 버튼 3개 리스너 / 카메라
 
@@ -373,9 +393,11 @@ Assets/
     Items/     HeartyFeed · IronGrain · BloomStone (.asset)
     Enemies/   FieldRat · ThornBoar · StoneGolem (.asset)      ← seed-only (함정 3.11)
     Battle/    FieldMap · RatField · BoarThicket · GolemRidge  ← seed-only (함정 3.11)
+    Eggs/      SpriglingEgg.asset                                        ← 8/15 신설
     Sprites/   Square.png (8×8) · Circle.png (64×64)   ← 실제 에셋이어야 한다
     SpeciesDatabase.asset · ItemDatabase.asset · EnemyDatabase.asset
     BattleEncounterDatabase.asset                              ← seed-only
+    EggDatabase.asset · ShopStockDatabase.asset                          ← 8/15 신설
   Scenes/FarmScene.unity            ← 손으로 편집하지 말 것. BuildAll 이 전량 생성
   Scenes/BattleScene.unity          ← 위와 같음
   Scripts/
@@ -385,19 +407,21 @@ Assets/
                      EvolutionRequirement · EvolutionCondition
                      SpeciesDatabase · ItemDatabase
                      BattleMapData · BattleEncounter(+EncounterEntry) · BattleEncounterDatabase
+                     EggData · EggDatabase · ShopStockDatabase(+ShopEntry/ShopEntryKind)  ← 8/15 신설
       Core/          CreatureInstance · Inventory · ActionResult · CareActions
                      EvolutionEvaluator · Roster · GameState
                      BattleUnit · BattleSimulator          ← 전투 화면 작업에서 손대지 않았다
                      SpawnPointPicker · BattleHandoff(+BattleConclusion/Request/Result)
                      SaveData · SaveSerializer
+                     ShopService                                                          ← 8/15 신설, TryBuy 한 곳
       Presentation/  GameRoot · CareManager · GameHud · UiFontApplier
-                     GamePanel(추상) · StoragePanel · RaisingPanel · BarnPanel · BattlePanel
+                     GamePanel(추상) · StoragePanel · RaisingPanel · BarnPanel · BattlePanel · ShopPanel
                      PanelLabels · PartyField
                      CreatureController · PlayerController · CameraPanController
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
                      BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  15개 파일(픽스처 14 + TestFixtures 헬퍼), 테스트 148개
+    Tests/EditMode/  18개 파일(픽스처 17 + TestFixtures 헬퍼), 테스트 175개
     Tests/PlayMode/  BattleSceneSmokeTests — 씬을 실제로 로드해 돌린다, 테스트 7개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
@@ -406,8 +430,10 @@ docs/
   superpowers/specs/2026-08-13-building-panels-design.md   창고·육성 패널 설계
   superpowers/specs/2026-08-13-battle-and-roster-design.md 전투·로스터 설계(사후 기록)
   superpowers/specs/2026-08-14-battle-screen-design.md     전투 화면 설계 ✅ 구현됨
+  superpowers/specs/2026-08-15-shop-design.md               상점 설계 ✅ 구현됨
   superpowers/plans/2026-08-06-...-mvp.md             MVP 구현 계획 + 실행 기록
   superpowers/plans/2026-08-14-battle-screen.md       전투 화면 구현 계획 + 실행 기록
+  superpowers/plans/2026-08-15-shop.md                상점 구현 계획(9 태스크) + 실행 기록
 ```
 
 **씬을 손으로 편집하지 말 것.** `GameBootstrap.BuildAll()` 이 전부 생성하므로,
@@ -418,9 +444,9 @@ docs/
 ## 7. 다음 할 것
 
 ```
-✅ 전투 + 전투 화면 (재화 획득)  ──▶  ⬜ 상점 (알·장비 구매)
+✅ 전투 + 전투 화면 (재화 획득)  ──▶  ✅ 상점 (알·장비 구매)
                                           │
-                                          ├──▶  ⬜ 부화소 (알 → 몬스터)
+                                          ├──▶  ⬜ 부화소 (알 → 몬스터)   ← 0순위
                                           │              │
                                           │              ▼
                                           │         ✅ 헛간
@@ -428,13 +454,13 @@ docs/
                                           └──▶  ✅ 창고
 ```
 
-**0순위 — 상점.** 재화가 이미 쌓이므로 경제 순환을 닫는 가장 빠른 길이다.
-단 **4.1(전투 진입점 이동)을 먼저 정해야 한다.** 이건 코드가 아니라 결정의 문제다.
+**0순위 — 부화소.** 상점 ✅ → 4.3(알 획득 경로)이 "상점 구매"로 결정됐으니 이제 착수할 수 있다.
+산 알은 지금 인벤토리에 `egg_sprigling` 키로 쌓이기만 하고 **깰 방법이 없다.**
+부화소 건물(x −6)은 이미 서 있지만 클릭하면 "알 시스템 준비 중" 로그만 뜬다 — 패널이 없다.
+`EggData.hatchesInto` 가 부화 결과 종을 이미 들고 있으니, 부화소는 그것을 읽어 로스터에
+새 케어를 추가하고 인벤토리에서 알을 빼는 것이 핵심이 될 것이다.
 
-**1순위 — 부화소.** 4.3(알 획득 경로)이 정해져야 착수할 수 있다.
-상점이 먼저 생기면 "상점에서 알을 산다" 로 자연히 풀린다.
-
-**틈날 때 — 전투 화면을 눈으로 한 번 볼 것.** 동작은 PlayMode 테스트가 지키지만
+**틈날 때 — 상점·전투 화면을 눈으로 한 번 볼 것.** 동작은 PlayMode 테스트가 지키지만
 "보기 좋은가"는 사람만 안다. 8절의 남은 항목이 그것이다.
 
 **나중에**: 상호작용 아이템 + "장착 후 특정 상호작용" 진화 경로, 소모품 별도 계통 재도입,
@@ -461,6 +487,17 @@ docs/
 > 배경에서 굴리려면 `Application.runInBackground = true` 를 켜라.
 
 **아직 손으로 확인 안 한 것**
+
+**8/15 상점 — 사람이 눈으로 본 적이 없다.** EditMode·PlayMode 테스트와 씬 무결성 검사는
+전부 통과했지만, 실제로 Play 해서 확인한 것은 하나도 없다.
+
+- [ ] 상점에서 장비를 사면 재화가 줄고 창고에 보유 수가 늘어난다
+- [ ] 재화가 모자랄 때 "재화가 모자란다" 로그가 뜨고 아무것도 바뀌지 않는다
+- [ ] 알을 사면 보유 수가 늘어난다 (아직 쓸 곳은 없다 — 부화소가 다음 작업)
+- [ ] 건물 5동이 맵 안에 다 들어오고, 슬라이드로 전부 볼 수 있다
+- [ ] 전투터를 눌러야 전투가 열리고, 상점은 상점이 열린다
+- [ ] 상점 패널이 화면에 보기 좋은가 (행 4개 + 닫기 버튼이 900×620 안에 들어오는가)
+- [ ] 건물 5동이 넓어진 맵(반너비 15)에서 어떻게 보이는가
 
 **8/14 전투 화면 — 남은 것은 "보기 좋은가" 뿐이다**
 
