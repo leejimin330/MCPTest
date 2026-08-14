@@ -353,5 +353,24 @@ namespace FarmCreature.Tests
             Assert.IsTrue(Restore(Json(Creature(), gold: -50), out loaded, out error), error);
             Assert.AreEqual(0, loaded.Gold, "음수 재화는 0 으로 막는다");
         }
+
+        [Test]
+        public void RoundTrip_KeepsEggsInInventory_WithoutBumpingVersion()
+        {
+            var inventory = new Inventory();
+            inventory.Add("bloom_stone", 1);
+            inventory.Add("egg_sprigling", 2);
+
+            string json = CaptureJson(StateOf(CreatureInstance.CreateNew(sprigling), inventory, 40));
+            StringAssert.Contains("\"version\": 3", json, "알이 들어와도 세이브 버전은 그대로다");
+
+            GameState restored;
+            string error;
+            Assert.IsTrue(Restore(json, out restored, out error), error);
+
+            Assert.AreEqual(2, restored.Inventory.GetCount("egg_sprigling"),
+                "알은 ItemDatabase 에 없지만 인벤토리는 문자열 id 만 담으므로 그대로 복원된다");
+            Assert.AreEqual(1, restored.Inventory.GetCount("bloom_stone"));
+        }
     }
 }

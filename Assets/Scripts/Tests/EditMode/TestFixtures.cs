@@ -138,5 +138,34 @@ namespace FarmCreature.Tests
             so.encounters = new List<BattleEncounter>(entries);
             return so;
         }
+
+        public static EggData MakeEgg(
+            string eggId, string displayName = null, CreatureSpeciesData hatchesInto = null)
+        {
+            var so = ScriptableObject.CreateInstance<EggData>();
+            so.eggId = eggId;
+            so.displayName = displayName ?? eggId;
+            so.hatchesInto = hatchesInto;
+            return so;
+        }
+
+        public static EggDatabase MakeEggDatabase(params EggData[] entries)
+        {
+            var so = ScriptableObject.CreateInstance<EggDatabase>();
+            so.eggs = new List<EggData>(entries);
+            return so;
+        }
+
+        public static ShopEntry MakeShopEntry(ShopEntryKind kind, string targetId, int price)
+        {
+            return new ShopEntry { kind = kind, targetId = targetId, price = price };
+        }
+
+        public static ShopStockDatabase MakeShopStock(params ShopEntry[] entries)
+        {
+            var so = ScriptableObject.CreateInstance<ShopStockDatabase>();
+            so.entries = new List<ShopEntry>(entries);
+            return so;
+        }
     }
 }
