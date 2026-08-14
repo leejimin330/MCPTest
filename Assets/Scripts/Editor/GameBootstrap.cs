@@ -54,7 +54,7 @@ namespace FarmCreature.EditorTools
             //   int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
             // 이 예외 없이 조용히 0 을 돌려줘, 창고의 [장착] 버튼과 전투터의 상대 버튼이
             // 한 개도 만들어지지 않은 채 씬이 저장됐다. 종료 코드는 0 이었다.
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var farmScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             EnsureFolders();
             EnsureSpriteAssets();
@@ -70,9 +70,54 @@ namespace FarmCreature.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            BuildScene(scene, speciesDb, itemDb, encounterDb, species["sprigling"], items);
+            BuildFarmScene(farmScene, speciesDb, itemDb, encounterDb, species["sprigling"], items);
 
-            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬을 생성했습니다: " + FarmScenePath);
+            // ★ 두 번째 NewScene 이 위에서 얻은 참조를 '다시' 죽인다 (함정 3.9와 같은 원리).
+            // 그래서 전투 씬을 채우기 전에 필요한 것을 경로에서 전부 다시 로드한다.
+            // 이 재로드를 빠뜨리면 슬롯도 버튼도 없는 전투 씬이 종료 코드 0 으로 조용히 저장된다.
+            var battleScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            ReloadSpriteAssets();
+            var battleMap = AssetDatabase.LoadAssetAtPath<BattleMapData>(BattleDir + "/FieldMap.asset");
+            var practiceEncounter = AssetDatabase.LoadAssetAtPath<BattleEncounter>(BattleDir + "/RatField.asset");
+            var practiceSpecies = AssetDatabase.LoadAssetAtPath<CreatureSpeciesData>(SpeciesDir + "/Sprigling.asset");
+
+            if (battleMap == null || practiceEncounter == null || practiceSpecies == null)
+            {
+                Debug.LogError("[FarmCreature] 전투 씬용 에셋 재로드 실패 — "
+                    + "map==null? " + (battleMap == null)
+                    + " encounter==null? " + (practiceEncounter == null)
+                    + " species==null? " + (practiceSpecies == null));
+            }
+
+            BuildBattleScene(battleScene, battleMap, practiceEncounter, practiceSpecies);
+
+            // 두 씬을 모두 등록한다. 안 하면 LoadScene 이 런타임에 실패한다 (설계 5.1).
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(FarmScenePath, true),
+                new EditorBuildSettingsScene(BattleScenePath, true)
+            };
+
+            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬 2개를 생성했습니다: "
+                + FarmScenePath + " / " + BattleScenePath);
+        }
+
+        /// <summary>
+        /// <c>NewScene</c> 이후에 스프라이트 참조를 되살린다.
+        /// PNG 를 다시 쓰지 않고 경로에서 로드만 한다 — 이미 만들어진 에셋이다.
+        /// </summary>
+        private static void ReloadSpriteAssets()
+        {
+            squareSprite = AssetDatabase.LoadAssetAtPath<Sprite>(SpritesDir + "/Square.png");
+            circleSprite = AssetDatabase.LoadAssetAtPath<Sprite>(SpritesDir + "/Circle.png");
+
+            if (squareSprite == null || circleSprite == null)
+            {
+                Debug.LogError("[FarmCreature] 스프라이트 재로드 실패 — NewScene 이후 참조가 죽었다. "
+                    + "square==null? " + (squareSprite == null)
+                    + " circle==null? " + (circleSprite == null));
+            }
         }
 
         // ---------- 폴더 ----------
@@ -513,7 +558,7 @@ namespace FarmCreature.EditorTools
         /// 빈 씬을 채운다. <paramref name="scene"/> 는 <see cref="BuildAll"/> 이 <b>에셋을 만지기 전에</b>
         /// 만들어 넘긴다 — 여기서 새로 열면 넘겨받은 에셋 참조가 그 자리에서 죽는다.
         /// </summary>
-        private static void BuildScene(
+        private static void BuildFarmScene(
             UnityEngine.SceneManagement.Scene scene,
             SpeciesDatabase speciesDb,
             ItemDatabase itemDb,
@@ -686,8 +731,192 @@ namespace FarmCreature.EditorTools
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, FarmScenePath);
+        }
 
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(FarmScenePath, true) };
+        /// <summary>
+        /// 전투 씬을 채운다. <paramref name="scene"/> 는 <see cref="BuildAll"/> 이 만들어 넘긴다 —
+        /// 여기서 새로 열면 넘겨받은 에셋 참조가 그 자리에서 죽는다 (함정 3.9).
+        ///
+        /// 유닛 슬롯은 아군 <see cref="Roster.MaxParty"/> 개 + 적 <see cref="BattleField.MaxEnemies"/> 개를
+        /// 미리 만들어 두고 <b>전부 꺼진 채로</b> 저장한다. 인원수에 맞춰 켜는 것은
+        /// <see cref="BattleSceneRoot"/> 의 일이다 (함정 3.1).
+        /// </summary>
+        private static void BuildBattleScene(
+            UnityEngine.SceneManagement.Scene scene,
+            BattleMapData map,
+            BattleEncounter practiceEncounter,
+            CreatureSpeciesData practiceSpecies)
+        {
+            // 카메라 — 농장과 달리 팬하지 않는다. 전투 맵은 한 화면에 다 들어온다.
+            var cameraGo = new GameObject("Main Camera");
+            cameraGo.tag = "MainCamera";
+            var camera = cameraGo.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.orthographicSize = 5.6f;
+            camera.backgroundColor = new Color(0.18f, 0.2f, 0.24f);
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.transform.position = new Vector3(0f, 0.6f, -10f);
+
+            // 탑뷰 바닥. 크기·색은 BattleSceneRoot 가 맵에서 읽어 덮어쓴다.
+            var groundGo = new GameObject("BattleGround");
+            var ground = groundGo.AddComponent<SpriteRenderer>();
+            ground.sprite = squareSprite;
+            ground.color = map != null ? map.groundColor : new Color(0.45f, 0.62f, 0.35f);
+            ground.sortingOrder = -100;
+            groundGo.transform.localScale = map != null
+                ? new Vector3(map.groundSize.x, map.groundSize.y, 1f)
+                : new Vector3(17f, 9f, 1f);
+            groundGo.transform.position = Vector3.zero;
+
+            var allySlots = new List<BattleUnitView>();
+            var enemySlots = new List<BattleUnitView>();
+
+            var allyRoot = new GameObject("AllySlots");
+            for (int i = 0; i < Roster.MaxParty; i++)
+            {
+                allySlots.Add(BuildUnitView(allyRoot.transform, "AllySlot" + i,
+                    new Color(0.55f, 0.85f, 0.35f)));
+            }
+
+            var enemyRoot = new GameObject("EnemySlots");
+            for (int i = 0; i < BattleField.MaxEnemies; i++)
+            {
+                enemySlots.Add(BuildUnitView(enemyRoot.transform, "EnemySlot" + i,
+                    new Color(0.8f, 0.35f, 0.35f)));
+            }
+
+            // UI — Canvas 하위여야 UiFontApplier 가 한글 폰트를 꽂아준다 (함정 3.7).
+            var canvasGo = new GameObject("Canvas",
+                typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(UiFontApplier));
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            new GameObject("EventSystem",
+                typeof(UnityEngine.EventSystems.EventSystem),
+                typeof(UnityEngine.EventSystems.StandaloneInputModule));
+
+            var titleText = CreateText(canvasGo.transform, "TitleText",
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -30f),
+                new Vector2(1200f, 60f), TextAnchor.MiddleCenter, 34);
+            titleText.color = Color.white;
+
+            var logText = CreateText(canvasGo.transform, "BattleLogText",
+                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 260f),
+                new Vector2(1100f, 220f), TextAnchor.LowerLeft, 24);
+            logText.color = new Color(0.9f, 0.9f, 0.78f);
+
+            var speedText = CreateText(canvasGo.transform, "SpeedText",
+                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-280f, 130f),
+                new Vector2(240f, 44f), TextAnchor.MiddleCenter, 26);
+            speedText.color = Color.white;
+
+            var root = new GameObject("BattleSceneRoot").AddComponent<BattleSceneRoot>();
+            root.ground = ground;
+            root.defaultMap = map;
+            root.allySlots = allySlots;
+            root.enemySlots = enemySlots;
+            root.titleText = titleText;
+            root.logText = logText;
+            root.speedText = speedText;
+            root.practiceEncounter = practiceEncounter;
+            root.practiceSpecies = practiceSpecies;
+
+            // 버튼 3개 — 배속 2개와 나가기. 배속은 int 인덱스를 넘긴다 (함정 3.6).
+            var buttonRoot = new GameObject("BattleButtons", typeof(RectTransform));
+            buttonRoot.transform.SetParent(canvasGo.transform, false);
+            CenterRect(buttonRoot.GetComponent<RectTransform>(), new Vector2(0f, -430f),
+                new Vector2(1200f, 80f));
+
+            var speed1 = CreatePanelButton(buttonRoot.transform, "Speed1x", "1x",
+                new Vector2(-180f, 0f), new Vector2(140f, 64f), new Color(0.36f, 0.5f, 0.68f));
+            UnityEventTools.AddIntPersistentListener(
+                speed1.onClick, new UnityAction<int>(root.SetSpeed), 0);
+
+            var speed2 = CreatePanelButton(buttonRoot.transform, "Speed2x", "2x",
+                new Vector2(-20f, 0f), new Vector2(140f, 64f), new Color(0.36f, 0.5f, 0.68f));
+            UnityEventTools.AddIntPersistentListener(
+                speed2.onClick, new UnityAction<int>(root.SetSpeed), 1);
+
+            var exitButton = CreatePanelButton(buttonRoot.transform, "Exit", "나가기",
+                new Vector2(200f, 0f), new Vector2(200f, 64f), new Color(0.6f, 0.42f, 0.32f));
+            UnityEventTools.AddVoidPersistentListener(
+                exitButton.onClick, new UnityAction(root.ExitBattle));
+
+            // 슬롯은 전부 꺼진 채로 저장한다 — 배선이 끝난 뒤에 끈다 (함정 3.8).
+            for (int i = 0; i < allySlots.Count; i++)
+            {
+                allySlots[i].gameObject.SetActive(false);
+            }
+
+            for (int i = 0; i < enemySlots.Count; i++)
+            {
+                enemySlots[i].gameObject.SetActive(false);
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, BattleScenePath);
+        }
+
+        /// <summary>
+        /// 유닛 슬롯 하나 — 몸통(Circle) · 체력바 바탕/채움(Square) · 이름표(TextMesh).
+        /// uGUI 가 아니라 SpriteRenderer/TextMesh 를 쓰는 이유는 <see cref="BattleUnitView"/> 주석에 있다.
+        /// </summary>
+        private static BattleUnitView BuildUnitView(Transform parent, string name, Color bodyColor)
+        {
+            const float barWidth = 1.3f;
+            const float barY = 0.85f;
+
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+
+            var bodyGo = new GameObject("Body");
+            bodyGo.transform.SetParent(go.transform, false);
+            var body = bodyGo.AddComponent<SpriteRenderer>();
+            body.sprite = circleSprite;
+            body.color = bodyColor;
+            body.sortingOrder = 0;
+
+            var backGo = new GameObject("HealthBarBack");
+            backGo.transform.SetParent(go.transform, false);
+            var back = backGo.AddComponent<SpriteRenderer>();
+            back.sprite = squareSprite;
+            back.color = new Color(0.1f, 0.1f, 0.12f, 0.85f);
+            back.sortingOrder = 1;
+            backGo.transform.localScale = new Vector3(barWidth, 0.16f, 1f);
+            backGo.transform.localPosition = new Vector3(0f, barY, 0f);
+
+            var fillGo = new GameObject("HealthBarFill");
+            fillGo.transform.SetParent(go.transform, false);
+            var fill = fillGo.AddComponent<SpriteRenderer>();
+            fill.sprite = squareSprite;
+            fill.color = new Color(0.4f, 0.82f, 0.4f);
+            fill.sortingOrder = 2;
+            fillGo.transform.localScale = new Vector3(barWidth, 0.12f, 1f);
+            fillGo.transform.localPosition = new Vector3(0f, barY, 0f);
+
+            var labelGo = new GameObject("NameLabel");
+            labelGo.transform.SetParent(go.transform, false);
+            labelGo.transform.localPosition = new Vector3(0f, barY + 0.22f, 0f);
+            var label = labelGo.AddComponent<TextMesh>();
+            label.text = name;
+            label.characterSize = 0.09f;
+            label.fontSize = 56;
+            label.anchor = TextAnchor.LowerCenter;
+            label.alignment = TextAlignment.Center;
+            label.color = Color.white;
+            labelGo.GetComponent<MeshRenderer>().sortingOrder = 3;
+
+            var view = go.AddComponent<BattleUnitView>();
+            view.body = body;
+            view.healthBarBack = back;
+            view.healthBarFill = fill;
+            view.nameLabel = label;
+            view.healthBarWidth = barWidth;
+
+            return view;
         }
 
         /// <summary>
