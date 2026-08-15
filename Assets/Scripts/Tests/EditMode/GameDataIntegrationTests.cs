@@ -322,5 +322,26 @@ namespace FarmCreature.Tests
                     "알 id 가 아이템 id 와 겹친다 — 인벤토리에서 서로를 덮어쓴다");
             }
         }
+
+        [Test]
+        public void EveryEgg_ActuallyHatchesIntoACreature()
+        {
+            Assert.Greater(eggDb.eggs.Count, 0, "알이 하나도 없으면 부화소가 빈 패널이 된다");
+
+            for (int i = 0; i < eggDb.eggs.Count; i++)
+            {
+                var egg = eggDb.eggs[i];
+                var state = new GameState(new Roster(), new Inventory(), 0);
+                state.Inventory.Add(egg.eggId, 1);
+
+                var result = HatchService.TryHatch(state, egg);
+
+                Assert.IsTrue(result.Success, egg.eggId + " 를 깨지 못했다: " + result.Message);
+                Assert.AreEqual(1, state.Roster.Count, egg.eggId + " 를 깼는데 케어가 안 늘었다");
+                Assert.AreSame(egg.hatchesInto, state.Roster.GetMember(0).CurrentSpecies,
+                    egg.eggId + " 에서 다른 종이 나왔다");
+                Assert.AreEqual(0, state.Inventory.GetCount(egg.eggId), "깬 알은 사라져야 한다");
+            }
+        }
     }
 }
