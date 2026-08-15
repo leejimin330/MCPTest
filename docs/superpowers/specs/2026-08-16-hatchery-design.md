@@ -189,10 +189,14 @@ public static string HatchRow(EggData egg, int owned);  // "스프리글링 알 
 
 | 픽스처 | 추가 |
 |---|---|
-| `PanelLabelsTests` (+3) | `HatchTitle` 의 `3/8` / `HatchRow` 의 보유 수·결과 종 / `null` → `"(빈 칸)"` |
-| `GameDataIntegrationTests` (+1) | **`ShopStockDatabase` 의 알 항목이 전부 `EggDatabase` 에 있는가** — 상점에서 산 알이 부화소에 안 뜨는 사고를 막는다 |
+| `PanelLabelsTests` (+4) | `HatchTitle` 의 `3/8` / `state == null` / `HatchRow` 의 보유 수·결과 종 / `null` → `"(빈 칸)"` |
+| `GameDataIntegrationTests` (+1) | **실제 에셋의 알을 전부 실제로 깨 본다** — `EggDatabase` 의 모든 알에 `TryHatch` 를 걸어 성공하고 `hatchesInto` 대로 나오는가 |
 
-→ 175 → **186개**
+→ 175 → **187개**
+
+> 처음에는 "상점 재고의 알이 `EggDatabase` 에 있는가"를 넣으려 했으나
+> `ShopStock_EveryEntry_PointsAtRealThingWithAPrice` 가 이미 덮고 있다.
+> 대신 **데이터와 규칙이 실제로 맞물리는지**를 본다 — 에셋의 알이 실제로 부화하는가.
 
 ### 6.2 씬 무결성 검사 (확장)
 
