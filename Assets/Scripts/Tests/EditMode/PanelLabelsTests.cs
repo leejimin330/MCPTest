@@ -309,14 +309,15 @@ namespace FarmCreature.Tests
         [Test]
         public void HatchRow_ShowsOwnedCountAndResultSpecies()
         {
+            // 종 표시 이름을 알 이름과 겹치지 않게 둔다 — 겹치면 결과 종을 빼먹어도 단언이 통과한다.
             var egg = TestFixtures.MakeEgg("egg_sprigling", "스프리글링 알",
-                TestFixtures.MakeSpecies("sprigling", "스프리글링"));
+                TestFixtures.MakeSpecies("sprigling", "새싹이"));
 
             string row = PanelLabels.HatchRow(egg, 2);
 
             StringAssert.Contains("스프리글링 알", row);
             StringAssert.Contains("보유 2", row);
-            StringAssert.Contains("스프리글링", row, "무엇이 나오는지 모르고 깨는 것은 이상하다");
+            StringAssert.Contains("새싹이", row, "무엇이 나오는지 모르고 깨는 것은 이상하다");
         }
 
         [Test]
