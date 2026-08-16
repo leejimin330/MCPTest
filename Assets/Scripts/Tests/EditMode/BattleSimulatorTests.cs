@@ -490,5 +490,52 @@ namespace FarmCreature.Tests
             Assert.AreEqual(battle.Allies[0].Position, battle.Allies[1].Position,
                 "겹친 좌표는 방향이 없다 — 지어내면 숨은 난수가 된다");
         }
+
+        // ---------- 스킬 사거리 ----------
+
+        [Test]
+        public void HealSkill_IgnoresDistance()
+        {
+            var healer = TestFixtures.MakeFighter("healer", attack: 10, defense: 0, health: 100,
+                attackInterval: Never, effect: SkillEffect.Heal,
+                cooldownSeconds: 1f, multiplier: 1.5f);
+            var wounded = TestFixtures.MakeFighter("wounded", attack: 1, defense: 0, health: 100,
+                attackInterval: Never, cooldownSeconds: Never);
+            var biter = TestFixtures.MakeEnemy("biter", maxHp: 500, attack: 20, defense: 0,
+                attackInterval: 0.5f);
+
+            var battle = new BattleSimulator(
+                Party(healer, wounded), new[] { biter },
+                new List<Vector2> { new Vector2(-40f, 0f), Vector2.zero },   // 회복사는 멀리
+                new List<Vector2> { Vector2.zero });
+
+            // 원점의 부상자가 맞아 체력이 깎이고, 멀리 있는 회복사가 회복시킨다.
+            for (int i = 0; i < 20; i++)
+            {
+                battle.Tick(0.1f);
+            }
+
+            StringAssert.Contains("회복", string.Join("\n", battle.Log),
+                "멀리 있는 회복사가 한 번도 회복시키지 않았다");
+        }
+
+        [Test]
+        public void DamageSkill_RespectsRange()
+        {
+            var caster = TestFixtures.MakeFighter("caster", attack: 10, defense: 0, health: 100,
+                attackInterval: Never, effect: SkillEffect.Damage,
+                cooldownSeconds: 0.5f, multiplier: 2f);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(caster), new[] { dummy },
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2> { new Vector2(500f, 0f) });   // 걸어도 못 닿는 거리
+
+            battle.Tick(2f);   // 쿨다운(0.5)은 네 번 찼다
+
+            Assert.AreEqual(500, battle.Enemies[0].Hp, "사거리 밖인데 스킬이 나갔다");
+        }
     }
 }

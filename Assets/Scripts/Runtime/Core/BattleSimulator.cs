@@ -180,20 +180,14 @@ namespace FarmCreature.Core
                 if (unit.Skill != null && unit.Skill.cooldownSeconds > 0f)
                 {
                     unit.SkillTimer += deltaTime;
-                }
 
-                unit.AttackTimer += deltaTime;
+                    // 회복은 거리를 무시한다. 공격 스킬만 사거리를 지킨다 (설계 3.4).
+                    // 그래서 이 블록이 사거리 검사보다 앞에 있다.
+                    bool skillReaches = unit.Skill.effect == SkillEffect.Heal || InRange(unit, target);
 
-                if (!InRange(unit, target))
-                {
-                    MoveToward(unit, target, side, opponents, deltaTime);
-                    continue;
-                }
-
-                if (unit.Skill != null && unit.Skill.cooldownSeconds > 0f)
-                {
                     int used = 0;
-                    while (unit.SkillTimer >= unit.Skill.cooldownSeconds
+                    while (skillReaches
+                           && unit.SkillTimer >= unit.Skill.cooldownSeconds
                            && used < MaxActionsPerTickPerUnit
                            && unit.IsAlive
                            && AnyAlive(opponents))
@@ -202,6 +196,14 @@ namespace FarmCreature.Core
                         UseSkill(unit, side, opponents);
                         used++;
                     }
+                }
+
+                unit.AttackTimer += deltaTime;
+
+                if (!InRange(unit, target))
+                {
+                    MoveToward(unit, target, side, opponents, deltaTime);
+                    continue;
                 }
 
                 int swings = 0;
