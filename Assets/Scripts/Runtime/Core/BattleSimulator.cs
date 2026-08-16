@@ -186,7 +186,7 @@ namespace FarmCreature.Core
 
                 if (!InRange(unit, target))
                 {
-                    MoveToward(unit, target, deltaTime);
+                    MoveToward(unit, target, side, opponents, deltaTime);
                     continue;
                 }
 
@@ -252,8 +252,11 @@ namespace FarmCreature.Core
 
         /// <summary>
         /// 타겟 쪽으로 <c>MoveSpeed × dt</c> 만큼 간다. <b>이동 중에는 때리지 않는다</b> (설계 1.3).
+        /// 겹침 밀어내기도 여기서 함께 더한다.
         /// </summary>
-        private void MoveToward(BattleUnit unit, BattleUnit target, float deltaTime)
+        private void MoveToward(
+            BattleUnit unit, BattleUnit target,
+            List<BattleUnit> side, List<BattleUnit> opponents, float deltaTime)
         {
             Vector2 toTarget = target.Position - unit.Position;
 
@@ -263,7 +266,55 @@ namespace FarmCreature.Core
                 return;
             }
 
-            unit.Position += toTarget.normalized * unit.MoveSpeed * deltaTime;
+            Vector2 velocity = toTarget.normalized * unit.MoveSpeed
+                               + Separation(unit, side, opponents);
+
+            // 밀어내기도 dt 로 스케일한다 — 안 하면 틱 길이에 따라 결과가 갈린다 (설계 4절).
+            unit.Position += velocity * deltaTime;
+        }
+
+        /// <summary>
+        /// <see cref="minSpacing"/> 안에 들어온 다른 살아있는 유닛들에게서 밀려나는 성분.
+        /// 아군·적을 가리지 않는다 — 겹쳐 보이는 것은 편을 안 가린다.
+        ///
+        /// <b>이동하는 유닛에만 적용된다</b> — 이미 멈춰 싸우는 유닛까지 밀면
+        /// 사거리 안팎을 오가며 떨린다 (설계 4절).
+        /// </summary>
+        private Vector2 Separation(BattleUnit unit, List<BattleUnit> side, List<BattleUnit> opponents)
+        {
+            if (minSpacing <= 0f)
+            {
+                return Vector2.zero;
+            }
+
+            return SeparationFrom(unit, side) + SeparationFrom(unit, opponents);
+        }
+
+        private Vector2 SeparationFrom(BattleUnit unit, List<BattleUnit> others)
+        {
+            Vector2 push = Vector2.zero;
+
+            for (int i = 0; i < others.Count; i++)
+            {
+                var other = others[i];
+                if (other == unit || !other.IsAlive)
+                {
+                    continue;
+                }
+
+                Vector2 away = unit.Position - other.Position;
+                float distance = away.magnitude;
+
+                // 정확히 겹치면 방향이 없다. 밀지 않는다 (설계 4절).
+                if (distance <= 0f || distance >= minSpacing)
+                {
+                    continue;
+                }
+
+                push += away.normalized * (minSpacing - distance);
+            }
+
+            return push;
         }
 
         private void BasicAttack(BattleUnit attacker, BattleUnit target, List<BattleUnit> opponents)

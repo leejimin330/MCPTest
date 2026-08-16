@@ -424,5 +424,71 @@ namespace FarmCreature.Tests
             Assert.Less(battle.Enemies[1].Hp, 500,
                 "달려든 적이 한 대도 안 맞았다 — 타겟을 다시 안 골랐다");
         }
+
+        // ---------- 겹침 ----------
+
+        /// <summary>
+        /// <b>한 틱의 이동량은 dt 에 정비례해야 한다</b> — 밀어내기 성분까지 포함해서다.
+        /// 밀어내기를 <c>dt</c> 로 안 곱하면 그 성분이 두 배가 되지 않아 여기서 걸린다.
+        ///
+        /// 여러 틱으로 쪼개 비교하지 않는 이유: 밀어내는 힘이 위치에 의존하므로
+        /// 오일러 적분 오차가 남아 <b>쪼갠 결과와 한 번에 간 결과는 원리상 같지 않다</b>.
+        /// 한 틱만 비교하면 그 오차 없이 dt 스케일링만 정확히 본다.
+        ///
+        /// <b>첫 번째 아군만 본다.</b> 한 틱 안에서 유닛은 순차로 갱신되므로
+        /// (기존 "아군 먼저, 그다음 적"과 같은 이유 — 순서를 고정해야 재현된다),
+        /// 두 번째 유닛은 <b>이미 움직인</b> 첫 번째를 기준으로 밀려난다.
+        /// 그 이동량은 dt 에 비례할 수 없다. 첫 번째 유닛은 모두가 제자리일 때 계산되므로 정확히 선형이다.
+        /// </summary>
+        [Test]
+        public void OneTickDisplacement_ScalesLinearlyWithDeltaTime()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: Never, cooldownSeconds: Never);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            // 아군 둘을 minSpacing(0.9) 안으로 붙여 밀어내기가 반드시 걸리게 한다.
+            var allyStart = new List<Vector2> { new Vector2(0f, 0f), new Vector2(0.2f, 0.1f) };
+            var foeStart = new List<Vector2> { new Vector2(9f, 0f) };
+
+            var single = new BattleSimulator(Party(hero, hero), new[] { dummy }, allyStart, foeStart);
+            var doubled = new BattleSimulator(Party(hero, hero), new[] { dummy }, allyStart, foeStart);
+
+            single.Tick(0.1f);
+            doubled.Tick(0.2f);
+
+            Vector2 moved = single.Allies[0].Position - allyStart[0];
+            Vector2 movedTwice = doubled.Allies[0].Position - allyStart[0];
+
+            Assert.AreEqual(moved.x * 2f, movedTwice.x, 0.0001f,
+                "dt 를 두 배로 했는데 이동량이 두 배가 아니다 — 밀어내기를 dt 로 안 곱했다");
+            Assert.AreEqual(moved.y * 2f, movedTwice.y, 0.0001f,
+                "dt 를 두 배로 했는데 이동량이 두 배가 아니다 — 밀어내기를 dt 로 안 곱했다");
+
+            // 밀어내기가 실제로 걸린 상태여야 이 테스트가 의미를 갖는다. y 로 밀려난 것이 그 증거다 —
+            // 타겟은 정확히 +x 쪽에 있으므로 y 이동은 오직 밀어내기에서만 나온다.
+            Assert.AreNotEqual(0f, moved.y,
+                "밀어내기가 안 걸렸다 — dt 곱을 빠뜨려도 이 테스트가 못 잡는다");
+        }
+
+        [Test]
+        public void ExactlyOverlappingUnits_AreNotPushed()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: Never, cooldownSeconds: Never);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero, hero), new[] { dummy },
+                Clustered(2),                                   // 아군 둘이 정확히 같은 좌표
+                new List<Vector2> { new Vector2(9f, 0f) });
+
+            battle.Tick(0.5f);
+
+            Assert.AreEqual(battle.Allies[0].Position, battle.Allies[1].Position,
+                "겹친 좌표는 방향이 없다 — 지어내면 숨은 난수가 된다");
+        }
     }
 }
