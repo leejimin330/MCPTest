@@ -53,6 +53,7 @@ namespace FarmCreature.Core
                 gold = state.Gold,
                 itemIds = new string[itemCount],
                 itemCounts = new int[itemCount],
+                clearedStageIds = ClearedIdsOf(state),
                 savedAtUtc = savedAtUtc
             };
 
@@ -63,6 +64,23 @@ namespace FarmCreature.Core
             }
 
             return data;
+        }
+
+        private static string[] ClearedIdsOf(GameState state)
+        {
+            if (state == null || state.Progress == null)
+            {
+                return new string[0];
+            }
+
+            var ids = state.Progress.ClearedStageIds;
+            var copy = new string[ids.Count];
+            for (int i = 0; i < ids.Count; i++)
+            {
+                copy[i] = ids[i];
+            }
+
+            return copy;
         }
 
         private static CreatureSaveData CaptureCreature(CreatureInstance creature)
@@ -132,7 +150,11 @@ namespace FarmCreature.Core
                 return false;
             }
 
-            if (data.version != SaveData.CurrentVersion)
+            // v3 은 필드가 하나 느는 것뿐이라 옮길 것이 없다 — 진행도를 빈 채로 승격한다.
+            // v2 이하는 보유 케어가 단일 → 배열로 바뀌어 옮길 방법이 없다 (설계 1.4).
+            const int OldestPromotableVersion = 3;
+
+            if (data.version > SaveData.CurrentVersion || data.version < OldestPromotableVersion)
             {
                 error = "지원하지 않는 세이브 버전입니다: " + data.version;
                 return false;
@@ -207,6 +229,14 @@ namespace FarmCreature.Core
             }
 
             state.EnsureTarget();
+
+            // v3 에는 이 배열이 없다 — null 이면 진행도 없이 시작한다 (승격).
+            // StageProgress 가 빈 id 와 중복을 걸러내므로 손상된 세이브도 안전하다.
+            var clearedIds = data.clearedStageIds ?? new string[0];
+            for (int i = 0; i < clearedIds.Length; i++)
+            {
+                state.Progress.MarkCleared(clearedIds[i]);
+            }
 
             error = null;
             return true;

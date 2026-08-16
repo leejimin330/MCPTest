@@ -21,6 +21,11 @@ namespace FarmCreature.Core
     {
         public GameState State;
         public BattleEncounter Encounter;
+
+        /// <summary>
+        /// 스테이지가 속한 맵의 전장. 비어 있으면 인카운터의 맵, 그것도 없으면 기본 맵 (설계 2.1).
+        /// </summary>
+        public BattleMapData Field;
     }
 
     /// <summary>
@@ -35,6 +40,12 @@ namespace FarmCreature.Core
         public int GoldReward;
 
         public GameState State;
+
+        /// <summary>
+        /// 이긴 스테이지의 id. 농장이 진행도를 기록할 때 쓴다.
+        /// 연습 전투는 빈 문자열이라 아무것도 기록되지 않는다.
+        /// </summary>
+        public string StageId;
     }
 
     /// <summary>
@@ -64,9 +75,9 @@ namespace FarmCreature.Core
             get { return result != null; }
         }
 
-        public static void SetRequest(GameState state, BattleEncounter encounter)
+        public static void SetRequest(GameState state, BattleEncounter encounter, BattleMapData field)
         {
-            request = new BattleRequest { State = state, Encounter = encounter };
+            request = new BattleRequest { State = state, Encounter = encounter, Field = field };
         }
 
         /// <summary>요청을 꺼내고 비운다. 없으면 <c>null</c> — 전투 씬을 단독으로 Play 한 경우다.</summary>
@@ -77,13 +88,15 @@ namespace FarmCreature.Core
             return taken;
         }
 
-        public static void SetResult(BattleConclusion conclusion, int goldReward, GameState state)
+        public static void SetResult(
+            BattleConclusion conclusion, int goldReward, GameState state, string stageId)
         {
             result = new BattleResult
             {
                 Conclusion = conclusion,
                 GoldReward = goldReward < 0 ? 0 : goldReward,
-                State = state
+                State = state,
+                StageId = stageId
             };
         }
 

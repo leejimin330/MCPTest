@@ -10,10 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a9bc2b0cc8b203c45a08903a1e4ceeb5, type: 3}
-  m_Name: RatField
+  m_Name: Field1
   m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.BattleEncounter
-  displayName: "\uB4E4\uD310 \u2014 \uB4E4\uC950 \uB5BC"
+  stageId: field_1
+  displayName: "\uB4E4\uD310 1"
   entries:
   - enemy: {fileID: 11400000, guid: a22a8d9cbc7246f4db5ae86f1aacae1f, type: 2}
-    count: 3
-  map: {fileID: 11400000, guid: 69719737ac3cb3d418053e3749338789, type: 2}
+    count: 2
+  map: {fileID: 0}
+  unlock: []

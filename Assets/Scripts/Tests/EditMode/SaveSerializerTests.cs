@@ -354,15 +354,24 @@ namespace FarmCreature.Tests
             Assert.AreEqual(0, loaded.Gold, "음수 재화는 0 으로 막는다");
         }
 
+        /// <summary>
+        /// 알은 <b>스키마에 자기 필드를 요구하지 않는다</b> — 인벤토리가 문자열 키 기반이라
+        /// 아이템과 같은 두 배열에 그대로 실린다.
+        ///
+        /// 예전에는 이것을 <c>"version": 3</c> 리터럴로 단언했는데, 그러면 <b>무관한 이유로</b>
+        /// 버전이 오를 때마다 깨진다(실제로 v4 에서 그랬다). 지금 버전과 같은지만 본다.
+        /// </summary>
         [Test]
-        public void RoundTrip_KeepsEggsInInventory_WithoutBumpingVersion()
+        public void RoundTrip_KeepsEggsInInventory_WithoutASchemaOfTheirOwn()
         {
             var inventory = new Inventory();
             inventory.Add("bloom_stone", 1);
             inventory.Add("egg_sprigling", 2);
 
             string json = CaptureJson(StateOf(CreatureInstance.CreateNew(sprigling), inventory, 40));
-            StringAssert.Contains("\"version\": 3", json, "알이 들어와도 세이브 버전은 그대로다");
+            StringAssert.Contains("\"version\": " + SaveData.CurrentVersion, json);
+            StringAssert.DoesNotContain("egg", json.Replace("egg_sprigling", string.Empty),
+                "알 전용 필드가 스키마에 생기면 안 된다");
 
             GameState restored;
             string error;
@@ -371,6 +380,78 @@ namespace FarmCreature.Tests
             Assert.AreEqual(2, restored.Inventory.GetCount("egg_sprigling"),
                 "알은 ItemDatabase 에 없지만 인벤토리는 문자열 id 만 담으므로 그대로 복원된다");
             Assert.AreEqual(1, restored.Inventory.GetCount("bloom_stone"));
+        }
+
+        // ---------- 진행도 (v4) ----------
+
+        [Test]
+        public void Progress_SurvivesRoundTrip()
+        {
+            var state = StateOf(CreatureInstance.CreateNew(sprigling), new Inventory());
+            state.Progress.MarkCleared("field_1");
+            state.Progress.MarkCleared("field_2");
+
+            string json = CaptureJson(state);
+
+            GameState restored;
+            string error;
+            Assert.IsTrue(Restore(json, out restored, out error), error);
+
+            Assert.IsTrue(restored.Progress.IsCleared("field_1"));
+            Assert.IsTrue(restored.Progress.IsCleared("field_2"));
+            Assert.AreEqual(2, restored.Progress.ClearedStageIds.Count);
+        }
+
+        [Test]
+        public void Version3Save_IsPromoted_WithEmptyProgress()
+        {
+            var state = StateOf(CreatureInstance.CreateNew(sprigling), new Inventory(), 42);
+
+            var data = SaveSerializer.Capture(state, Stamp);
+            data.version = 3;
+            data.clearedStageIds = null;          // v3 에는 이 필드가 없었다
+            string json = SaveSerializer.ToJson(data);
+
+            GameState restored;
+            string error;
+            Assert.IsTrue(Restore(json, out restored, out error),
+                "v3 은 버리지 않고 승격한다: " + error);
+
+            Assert.AreEqual(42, restored.Gold, "재화는 그대로 살아야 한다");
+            Assert.AreEqual(1, restored.Roster.Count, "케어도 그대로 살아야 한다");
+            Assert.AreEqual(0, restored.Progress.ClearedStageIds.Count, "진행도만 빈 채로 시작한다");
+        }
+
+        [Test]
+        public void Version2Save_IsStillRejected()
+        {
+            var state = StateOf(CreatureInstance.CreateNew(sprigling), new Inventory());
+
+            var data = SaveSerializer.Capture(state, Stamp);
+            data.version = 2;
+            string json = SaveSerializer.ToJson(data);
+
+            GameState restored;
+            string error;
+            Assert.IsFalse(Restore(json, out restored, out error));
+            Assert.IsNotEmpty(error);
+        }
+
+        [Test]
+        public void RestoredProgress_DropsBlankAndDuplicateIds()
+        {
+            var state = StateOf(CreatureInstance.CreateNew(sprigling), new Inventory());
+
+            var data = SaveSerializer.Capture(state, Stamp);
+            data.clearedStageIds = new[] { "field_1", "", "field_1", null, "field_2" };
+            string json = SaveSerializer.ToJson(data);
+
+            GameState restored;
+            string error;
+            Assert.IsTrue(Restore(json, out restored, out error), error);
+
+            Assert.AreEqual(2, restored.Progress.ClearedStageIds.Count,
+                "손으로 고친 세이브가 진행도를 오염시키면 안 된다");
         }
     }
 }

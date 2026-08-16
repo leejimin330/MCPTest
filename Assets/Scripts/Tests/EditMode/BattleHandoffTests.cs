@@ -38,7 +38,7 @@ namespace FarmCreature.Tests
             var state = MakeState();
             var encounter = TestFixtures.MakeEncounter("들판");
 
-            BattleHandoff.SetRequest(state, encounter);
+            BattleHandoff.SetRequest(state, encounter, null);
             var taken = BattleHandoff.TakeRequest();
 
             Assert.IsNotNull(taken);
@@ -49,7 +49,7 @@ namespace FarmCreature.Tests
         [Test]
         public void Request_IsClearedOnceTaken()
         {
-            BattleHandoff.SetRequest(MakeState(), TestFixtures.MakeEncounter("들판"));
+            BattleHandoff.SetRequest(MakeState(), TestFixtures.MakeEncounter("들판"), null);
 
             Assert.IsNotNull(BattleHandoff.TakeRequest());
             Assert.IsNull(BattleHandoff.TakeRequest(), "두 번째로 꺼내면 비어 있어야 한다");
@@ -68,7 +68,7 @@ namespace FarmCreature.Tests
         {
             var state = MakeState();
 
-            BattleHandoff.SetResult(BattleConclusion.Victory, 24, state);
+            BattleHandoff.SetResult(BattleConclusion.Victory, 24, state, "field_1");
             var taken = BattleHandoff.TakeResult();
 
             Assert.IsNotNull(taken);
@@ -80,7 +80,7 @@ namespace FarmCreature.Tests
         [Test]
         public void Result_IsClearedOnceTaken()
         {
-            BattleHandoff.SetResult(BattleConclusion.Defeat, 0, MakeState());
+            BattleHandoff.SetResult(BattleConclusion.Defeat, 0, MakeState(), "field_1");
 
             Assert.IsNotNull(BattleHandoff.TakeResult());
             Assert.IsNull(BattleHandoff.TakeResult(),
@@ -94,7 +94,7 @@ namespace FarmCreature.Tests
             // 재화는 농장 쪽에서만 더한다 (설계 3.3). 전달자는 액수만 나른다.
             var state = MakeState();
 
-            BattleHandoff.SetResult(BattleConclusion.Victory, 24, state);
+            BattleHandoff.SetResult(BattleConclusion.Victory, 24, state, "field_1");
 
             Assert.AreEqual(30, state.Gold, "전달자가 재화를 건드리면 지급 지점이 둘이 된다");
         }
@@ -102,13 +102,33 @@ namespace FarmCreature.Tests
         [Test]
         public void Clear_EmptiesBothSides()
         {
-            BattleHandoff.SetRequest(MakeState(), TestFixtures.MakeEncounter("들판"));
-            BattleHandoff.SetResult(BattleConclusion.Aborted, 0, MakeState());
+            BattleHandoff.SetRequest(MakeState(), TestFixtures.MakeEncounter("들판"), null);
+            BattleHandoff.SetResult(BattleConclusion.Aborted, 0, MakeState(), "field_1");
 
             BattleHandoff.Clear();
 
             Assert.IsFalse(BattleHandoff.HasRequest);
             Assert.IsFalse(BattleHandoff.HasResult);
+        }
+
+        [Test]
+        public void Request_CarriesTheField()
+        {
+            var field = TestFixtures.MakeBattleMap();
+
+            BattleHandoff.SetRequest(MakeState(), null, field);
+            var taken = BattleHandoff.TakeRequest();
+
+            Assert.AreSame(field, taken.Field, "전장은 맵이 정한다 — 요청에 실어 보낸다");
+        }
+
+        [Test]
+        public void Result_CarriesTheStageId()
+        {
+            BattleHandoff.SetResult(BattleConclusion.Victory, 10, MakeState(), "field_1");
+            var taken = BattleHandoff.TakeResult();
+
+            Assert.AreEqual("field_1", taken.StageId, "농장이 이것으로 진행도를 기록한다");
         }
     }
 }

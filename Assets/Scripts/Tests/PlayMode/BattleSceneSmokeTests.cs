@@ -62,8 +62,11 @@ namespace FarmCreature.Tests
             Assert.Greater(ActiveCount(root.enemySlots), 0,
                 "적이 한 마리도 화면에 서지 않았다 — 인카운터가 비었거나 슬롯이 안 켜졌다");
 
-            Assert.AreEqual(3, ActiveCount(root.enemySlots),
-                "연습 인카운터(들쥐 떼)는 3마리여야 한다");
+            // 마리 수는 인카운터 데이터에서 읽는다. 숫자를 박아 두면 씨앗 밸런스를 만질 때마다
+            // 테스트가 깨진다 — 실제로 스테이지를 다시 깔면서 3 → 2 가 되어 그랬다.
+            Assert.IsNotNull(root.practiceEncounter, "연습 인카운터가 배선되지 않았다");
+            Assert.AreEqual(root.practiceEncounter.TotalEnemyCount, ActiveCount(root.enemySlots),
+                "화면에 선 적 수가 연습 인카운터의 마리 수와 다르다");
         }
 
         [UnityTest]
@@ -148,7 +151,7 @@ namespace FarmCreature.Tests
             var species = FindRoot().practiceSpecies;
 
             var state = MakeState(species, gold: 30);
-            BattleHandoff.SetRequest(state, encounter);
+            BattleHandoff.SetRequest(state, encounter, null);
 
             yield return LoadScene(BattleSceneName);
             yield return RunUntil(() => BattleHandoff.HasResult);
@@ -178,7 +181,7 @@ namespace FarmCreature.Tests
             Assert.IsTrue(fed.Success, "먹이주기가 실패하면 이 테스트가 무의미해진다");
             int fullnessBefore = state.Target.Fullness;
 
-            BattleHandoff.SetRequest(state, encounter);
+            BattleHandoff.SetRequest(state, encounter, null);
             yield return LoadScene(BattleSceneName);
             yield return RunUntil(() => BattleHandoff.HasResult);
             Assert.IsTrue(BattleHandoff.HasResult, "전투가 끝나지 않았다");
@@ -219,7 +222,13 @@ namespace FarmCreature.Tests
                 care.State.Roster.LeaveParty(care.State.Roster.Party[0]);
             }
 
-            panel.StartEncounter(0);
+            // 전투터는 2단계다 — 먼저 맵을 열고, 그다음 스테이지를 고른다 (설계 5절).
+            panel.SelectRow(0);
+            yield return null;
+            Assert.AreEqual(FarmSceneName, SceneManager.GetActiveScene().name,
+                "맵을 고른 것만으로 씬이 바뀌면 안 된다");
+
+            panel.SelectRow(0);
             yield return null;
 
             Assert.AreEqual(FarmSceneName, SceneManager.GetActiveScene().name,
@@ -266,7 +275,7 @@ namespace FarmCreature.Tests
         private static int PeekReward()
         {
             var result = BattleHandoff.TakeResult();
-            BattleHandoff.SetResult(result.Conclusion, result.GoldReward, result.State);
+            BattleHandoff.SetResult(result.Conclusion, result.GoldReward, result.State, result.StageId);
             return result.Conclusion == BattleConclusion.Victory ? result.GoldReward : 0;
         }
 

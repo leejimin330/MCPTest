@@ -132,11 +132,45 @@ namespace FarmCreature.Tests
             return so;
         }
 
-        public static BattleEncounterDatabase MakeEncounterDatabase(params BattleEncounter[] entries)
+        /// <summary>스테이지 픽스처. 해금 조건을 직접 넘긴다 (null 이면 항상 열림).</summary>
+        public static BattleEncounter MakeStage(
+            string stageId, string displayName, List<StageUnlock> unlock,
+            params (EnemyData enemy, int count)[] entries)
         {
-            var so = ScriptableObject.CreateInstance<BattleEncounterDatabase>();
-            so.encounters = new List<BattleEncounter>(entries);
+            var so = MakeEncounter(displayName, entries);
+            so.stageId = stageId;
+            so.map = null;                     // 전장은 맵이 정한다 (설계 2.1)
+            so.unlock = unlock ?? new List<StageUnlock>();
             return so;
+        }
+
+        public static StageMap MakeStageMap(string displayName, params BattleEncounter[] stages)
+        {
+            var so = ScriptableObject.CreateInstance<StageMap>();
+            so.displayName = displayName;
+            so.field = MakeBattleMap();
+            so.stages = new List<BattleEncounter>(stages);
+            return so;
+        }
+
+        public static StageMapDatabase MakeStageMapDatabase(params StageMap[] maps)
+        {
+            var so = ScriptableObject.CreateInstance<StageMapDatabase>();
+            so.maps = new List<StageMap>(maps);
+            return so;
+        }
+
+        /// <summary>해금 조건 한 줄. 안 쓰는 필드는 비워 둔다.</summary>
+        public static StageUnlock Unlock(
+            StageUnlockKind kind, string stageId = null, string itemId = null, int count = 1)
+        {
+            return new StageUnlock
+            {
+                kind = kind,
+                stageId = stageId,
+                itemId = itemId,
+                count = count
+            };
         }
 
         public static EggData MakeEgg(

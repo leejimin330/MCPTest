@@ -266,6 +266,74 @@ namespace FarmCreature.Presentation
             return egg.displayName + "   보유 " + owned + "   →  " + result;
         }
 
+        // ---------- 맵 / 스테이지 ----------
+
+        /// <summary>맵 한 줄. 어디까지 왔는지를 <c>1/3</c> 로 보여준다.</summary>
+        public static string MapRow(StageMap map, StageProgress progress)
+        {
+            if (map == null)
+            {
+                return "(빈 칸)";
+            }
+
+            return map.displayName + "   " + map.ClearedCount(progress) + "/" + map.Count;
+        }
+
+        /// <summary>스테이지 목록의 제목. 맵 이름과 진척을 함께 보여준다.</summary>
+        public static string StageMapTitle(StageMap map, StageProgress progress)
+        {
+            if (map == null)
+            {
+                return "전투터";
+            }
+
+            return map.displayName + "   " + map.ClearedCount(progress) + "/" + map.Count + " 클리어";
+        }
+
+        /// <summary>
+        /// 스테이지 한 줄. <b>잠겼으면 왜 잠겼는지 함께 적는다</b> —
+        /// 회색 버튼만 있는 것보다 정보가 많다 (설계 1.3).
+        /// </summary>
+        public static string StageRow(
+            StageMap map, int stageIndex, StageProgress progress,
+            Inventory inventory, ItemDatabase itemDatabase)
+        {
+            var stage = map != null ? map.Get(stageIndex) : null;
+            if (stage == null)
+            {
+                return "(빈 칸)";
+            }
+
+            string head = stage.displayName + "   적 " + stage.TotalEnemyCount
+                          + " · 재화 " + stage.TotalGoldReward;
+
+            string reason = StageUnlockEvaluator.LockReason(
+                map, stageIndex, progress, inventory, itemDatabase);
+
+            if (reason != null)
+            {
+                return head + "   [잠김] " + reason;
+            }
+
+            if (progress != null && progress.IsCleared(stage.stageId))
+            {
+                return head + "   ✓ 클리어";
+            }
+
+            return head;
+        }
+
+        /// <summary>페이지가 하나뿐이면 아무것도 보여주지 않는다.</summary>
+        public static string PageIndicator(int page, int pageCount)
+        {
+            if (pageCount <= 1)
+            {
+                return string.Empty;
+            }
+
+            return (page + 1) + "/" + pageCount;
+        }
+
         public static string GoldLine(int gold)
         {
             return "재화 " + gold;

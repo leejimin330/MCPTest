@@ -10,10 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a9bc2b0cc8b203c45a08903a1e4ceeb5, type: 3}
-  m_Name: GolemRidge
+  m_Name: Field3
   m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.BattleEncounter
-  displayName: "\uBC14\uC704 \uC5B8\uB355 \u2014 \uBC14\uC704\uACE8\uB818"
+  stageId: field_3
+  displayName: "\uB4E4\uD310 3"
   entries:
-  - enemy: {fileID: 11400000, guid: b821f17d51351e2488d437c6892678f5, type: 2}
+  - enemy: {fileID: 11400000, guid: 23329d10b0681ca4b9710577e49ae8fd, type: 2}
     count: 1
-  map: {fileID: 11400000, guid: 69719737ac3cb3d418053e3749338789, type: 2}
+  - enemy: {fileID: 11400000, guid: a22a8d9cbc7246f4db5ae86f1aacae1f, type: 2}
+    count: 2
+  map: {fileID: 0}
+  unlock:
+  - kind: 0
+    stageId: 
+    itemId: 
+    count: 1

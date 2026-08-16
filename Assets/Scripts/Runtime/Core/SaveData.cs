@@ -31,9 +31,12 @@ namespace FarmCreature.Core
     {
         /// <summary>
         /// v2 → v3 에서 케어 1마리 구조가 <b>로스터(여러 마리) + 파티 + 재화</b>로 바뀌었다.
-        /// 이전 버전은 지원하지 않고 새 게임으로 폴백한다 (v1 때와 같은 정책).
+        /// v2 이하는 옮길 방법이 없어 새 게임으로 폴백한다.
+        ///
+        /// v3 → v4 는 <see cref="clearedStageIds"/> 가 <b>느는 것뿐</b>이라 옮길 것이 없다 —
+        /// v3 세이브는 진행도만 빈 채로 승격한다 (설계 1.4).
         /// </summary>
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 4;
 
         public int version = CurrentVersion;
 
@@ -50,6 +53,10 @@ namespace FarmCreature.Core
 
         public string[] itemIds = new string[0];
         public int[] itemCounts = new int[0];
+
+        /// <summary>깬 스테이지의 id. <b>인덱스가 아니라 id 다</b> (설계 1.1). v4 신설.</summary>
+        public string[] clearedStageIds = new string[0];
+
         public string savedAtUtc;
     }
 }

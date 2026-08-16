@@ -91,7 +91,14 @@ namespace FarmCreature.Presentation
             {
                 case BattleConclusion.Victory:
                     state.AddGold(result.GoldReward);
-                    return "승리했다! 재화 " + result.GoldReward + " 획득.";
+
+                    // 진행도가 기록되는 지점도 여기 하나뿐이다 (설계 3.3) — 재화와 같은 자리다.
+                    // 빈 id 는 StageProgress 가 알아서 무시한다. 연습 전투가 그 경우다.
+                    bool firstClear = state.Progress.MarkCleared(result.StageId);
+
+                    return firstClear
+                        ? "승리했다! 재화 " + result.GoldReward + " 획득. 새 길이 열렸다."
+                        : "승리했다! 재화 " + result.GoldReward + " 획득.";
 
                 case BattleConclusion.Defeat:
                     return "패배했다. 케어는 다치지 않는다 — 더 키워서 다시 오자.";

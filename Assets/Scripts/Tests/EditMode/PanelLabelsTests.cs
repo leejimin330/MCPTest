@@ -331,5 +331,65 @@ namespace FarmCreature.Tests
         {
             Assert.AreEqual("(빈 칸)", PanelLabels.HatchRow(null, 0));
         }
+
+        // ---------- 맵 / 스테이지 ----------
+
+        private BattleEncounter StageFor(string id, params StageUnlock[] unlock)
+        {
+            var rat = TestFixtures.MakeEnemy("rat", maxHp: 8, attack: 3, defense: 1);
+            return TestFixtures.MakeStage(
+                id, id, new System.Collections.Generic.List<StageUnlock>(unlock), (rat, 1));
+        }
+
+        [Test]
+        public void MapRow_ShowsClearedOverTotal()
+        {
+            var map = TestFixtures.MakeStageMap("들쥐 들판", StageFor("a"), StageFor("b"), StageFor("c"));
+            var progress = new StageProgress();
+            progress.MarkCleared("a");
+
+            string row = PanelLabels.MapRow(map, progress);
+
+            StringAssert.Contains("들쥐 들판", row);
+            StringAssert.Contains("1/3", row, "어디까지 왔는지 한눈에 보여야 한다");
+        }
+
+        [Test]
+        public void MapRow_NullMap_IsEmptySlot()
+        {
+            Assert.AreEqual("(빈 칸)", PanelLabels.MapRow(null, new StageProgress()));
+        }
+
+        [Test]
+        public void StageRow_MarksClearedStages()
+        {
+            var map = TestFixtures.MakeStageMap("맵", StageFor("들판 1"));
+            var progress = new StageProgress();
+            progress.MarkCleared("들판 1");
+
+            string row = PanelLabels.StageRow(map, 0, progress, new Inventory(), null);
+
+            StringAssert.Contains("들판 1", row);
+            StringAssert.Contains("클리어", row);
+        }
+
+        [Test]
+        public void StageRow_ShowsWhyItIsLocked()
+        {
+            var previous = TestFixtures.Unlock(StageUnlockKind.PreviousStageCleared);
+            var map = TestFixtures.MakeStageMap("맵", StageFor("들판 1"), StageFor("들판 2", previous));
+
+            string row = PanelLabels.StageRow(map, 1, new StageProgress(), new Inventory(), null);
+
+            StringAssert.Contains("들판 1", row, "무엇을 하면 열리는지 줄에 보여야 한다");
+            StringAssert.Contains("잠김", row);
+        }
+
+        [Test]
+        public void PageIndicator_IsEmptyWhenThereIsOnlyOnePage()
+        {
+            Assert.AreEqual(string.Empty, PanelLabels.PageIndicator(0, 1));
+            StringAssert.Contains("2/3", PanelLabels.PageIndicator(1, 3));
+        }
     }
 }

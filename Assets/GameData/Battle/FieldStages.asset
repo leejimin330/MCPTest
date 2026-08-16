@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ceb667974162b404bbae52d59abecec6, type: 3}
+  m_Name: FieldStages
+  m_EditorClassIdentifier: FarmCreature.Runtime::FarmCreature.Data.StageMap
+  displayName: "\uB4E4\uC950 \uB4E4\uD310"
+  field: {fileID: 11400000, guid: 69719737ac3cb3d418053e3749338789, type: 2}
+  stages:
+  - {fileID: 11400000, guid: 1224ae941e5214a449155cf6ba2bde3b, type: 2}
+  - {fileID: 11400000, guid: 30ac19d6c207f1247bea44eadee6d7a7, type: 2}
+  - {fileID: 11400000, guid: 701989e58f0d5794f98b1f9472050bd1, type: 2}
+  - {fileID: 11400000, guid: c9cff00a2bdc71048befeb093cb22040, type: 2}
