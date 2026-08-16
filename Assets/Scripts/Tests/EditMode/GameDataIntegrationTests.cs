@@ -15,12 +15,14 @@ namespace FarmCreature.Tests
         private const string ItemDbPath = "Assets/GameData/ItemDatabase.asset";
         private const string EggDbPath = "Assets/GameData/EggDatabase.asset";
         private const string ShopStockPath = "Assets/GameData/ShopStockDatabase.asset";
+        private const string StageDbPath = "Assets/GameData/StageMapDatabase.asset";
         private const int SafetyCap = 300;
 
         private SpeciesDatabase speciesDb;
         private ItemDatabase itemDb;
         private EggDatabase eggDb;
         private ShopStockDatabase shopStock;
+        private StageMapDatabase stageDb;
 
         [SetUp]
         public void SetUp()
@@ -34,6 +36,9 @@ namespace FarmCreature.Tests
             Assert.IsNotNull(itemDb, "ItemDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
             Assert.IsNotNull(eggDb, "EggDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
             Assert.IsNotNull(shopStock, "ShopStockDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
+
+            stageDb = AssetDatabase.LoadAssetAtPath<StageMapDatabase>(StageDbPath);
+            Assert.IsNotNull(stageDb, "StageMapDatabase 에셋이 없다. GameBootstrap.BuildAll 을 먼저 실행할 것.");
         }
 
         // ---- 데이터 무결성 ----
@@ -341,6 +346,77 @@ namespace FarmCreature.Tests
                 Assert.AreSame(egg.hatchesInto, state.Roster.GetMember(0).CurrentSpecies,
                     egg.eggId + " 에서 다른 종이 나왔다");
                 Assert.AreEqual(0, state.Inventory.GetCount(egg.eggId), "깬 알은 사라져야 한다");
+            }
+        }
+
+        // ---------- 맵 / 스테이지 ----------
+
+        [Test]
+        public void EveryStage_HasANonBlankId()
+        {
+            for (int m = 0; m < stageDb.Count; m++)
+            {
+                var map = stageDb.Get(m);
+                for (int s = 0; s < map.Count; s++)
+                {
+                    Assert.IsFalse(string.IsNullOrEmpty(map.Get(s).stageId),
+                        map.displayName + " 의 " + s + "번 스테이지에 id 가 없다 — 진행도를 기록할 수 없다");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 진행도가 id 로 기록되므로 <b>중복이면 조용히 틀린다</b> — 하나를 깨면 다른 것도
+        /// 깬 것이 된다. 이 설계의 핵심 방어선이다 (설계 6.1).
+        /// </summary>
+        [Test]
+        public void StageIds_AreUniqueAcrossAllMaps()
+        {
+            var seen = new System.Collections.Generic.HashSet<string>();
+
+            for (int m = 0; m < stageDb.Count; m++)
+            {
+                var map = stageDb.Get(m);
+                for (int s = 0; s < map.Count; s++)
+                {
+                    string id = map.Get(s).stageId;
+                    Assert.IsTrue(seen.Add(id), "stageId 가 겹친다: " + id);
+                }
+            }
+        }
+
+        [Test]
+        public void EveryMap_HasAField_AndItsFirstStageIsOpen()
+        {
+            Assert.Greater(stageDb.Count, 0, "맵이 하나도 없으면 전투터가 빈 화면이 된다");
+
+            for (int m = 0; m < stageDb.Count; m++)
+            {
+                var map = stageDb.Get(m);
+                Assert.IsNotNull(map.field, map.displayName + " 에 전장이 배선되지 않았다");
+                Assert.Greater(map.Count, 0, map.displayName + " 에 스테이지가 없다");
+
+                Assert.IsTrue(StageUnlockEvaluator.IsUnlocked(
+                    map, 0, new StageProgress(), new Inventory()),
+                    map.displayName + " 의 첫 스테이지가 잠겨 있다 — 아무도 들어갈 수 없다");
+            }
+        }
+
+        [Test]
+        public void EveryStage_FitsInTheEnemySlots()
+        {
+            for (int m = 0; m < stageDb.Count; m++)
+            {
+                var map = stageDb.Get(m);
+                for (int s = 0; s < map.Count; s++)
+                {
+                    var stage = map.Get(s);
+                    Assert.LessOrEqual(stage.TotalEnemyCount,
+                        FarmCreature.Presentation.BattleField.MaxEnemies,
+                        stage.displayName + " 의 적이 슬롯보다 많다");
+                    Assert.Greater(stage.TotalEnemyCount, 0,
+                        stage.displayName + " 에 적이 없다 — 눌러도 아무 일이 없다");
+                }
             }
         }
     }

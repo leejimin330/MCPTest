@@ -62,8 +62,11 @@ namespace FarmCreature.Tests
             Assert.Greater(ActiveCount(root.enemySlots), 0,
                 "적이 한 마리도 화면에 서지 않았다 — 인카운터가 비었거나 슬롯이 안 켜졌다");
 
-            Assert.AreEqual(3, ActiveCount(root.enemySlots),
-                "연습 인카운터(들쥐 떼)는 3마리여야 한다");
+            // 마리 수는 인카운터 데이터에서 읽는다. 숫자를 박아 두면 씨앗 밸런스를 만질 때마다
+            // 테스트가 깨진다 — 실제로 스테이지를 다시 깔면서 3 → 2 가 되어 그랬다.
+            Assert.IsNotNull(root.practiceEncounter, "연습 인카운터가 배선되지 않았다");
+            Assert.AreEqual(root.practiceEncounter.TotalEnemyCount, ActiveCount(root.enemySlots),
+                "화면에 선 적 수가 연습 인카운터의 마리 수와 다르다");
         }
 
         [UnityTest]

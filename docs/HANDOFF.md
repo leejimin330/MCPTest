@@ -12,6 +12,8 @@
 > **알 → 새 케어**가 이어져 MVP 순환이 닫혔다.
 > 같은 날 **전투가 위치 기반으로 바뀌었다** — 유닛이 가장 가까운 적으로 걸어가 사거리 안에서
 > 싸운다. **"좌표는 표시 전용"이라는 8/14 의 결정이 뒤집혔다**(2.4절).
+> 이어서 **맵/스테이지 진행 구조**가 들어와 전투터가 2단계가 되고 **순서대로 해금**된다(2.6절).
+> 세이브가 v3 → **v4** 로 올랐다.
 
 ---
 
@@ -19,11 +21,11 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **205/205 통과** (2026-08-16, 187 + 위치 기반 전투 18) |
+| EditMode 테스트 | **238/238 통과** (2026-08-16, 205 + 맵/스테이지 33) |
 | PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절). **스폰이 랜덤이라 세 번 연속 통과로 확인했다** |
 | 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
-| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동이 전부 패널을 연다**, 패널 6종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel), 건물 x 좌표가 맵 안 |
-| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **전투 씬 자동전투** · **상점 구매**(장비·알) · **알 부화** · 저장까지 **한 바퀴 가능** |
+| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동이 전부 패널을 연다**, 패널 6종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel), **전투터 줄·[선택] 버튼 고정 6칸**(데이터 개수와 무관), 건물 x 좌표가 맵 안 |
+| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **맵→스테이지 선택** · **전투 씬 자동전투** · **상점 구매**(장비·알) · **알 부화** · 저장까지 **한 바퀴 가능** |
 | Play 확인 | **전투는 2026-08-16 에 눈으로 봤다** — 이동·교전·스킬·승패 정상, 겹침 문제를 찾아 고쳤다(4.8). **상점·부화소·농장은 아직 안 봤다.** 남은 항목은 8절 |
 | git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, **작업 브랜치 없음**(전부 병합됨) |
 
@@ -39,7 +41,7 @@
 | 부화소 (x −6) | ✅ **`HatchPanel`.** 알을 깨서 헛간에 새 케어를 넣는다. 헛간이 가득 차면 **거부하고 알은 남는다** |
 | 창고 (x 0) | ✅ 장착 / 해제 |
 | 상점 (x +6) | ✅ **`ShopPanel`.** 장비 3종(무쇠 발톱 30 / 돌 껍질 30 / 블룸 스톤 45) + 스프리글링 알(60) 구매. 재고 무한, 되팔기 없음 |
-| 전투터 (x +12) | ✅ **신설.** 인카운터를 고르면 전투 씬으로 간다 (4.1 해소 — 상점 건물에서 옮겨왔다) |
+| 전투터 (x +12) | ✅ **맵 → 스테이지 2단계.** 맵을 고르고 그 안의 스테이지를 고른다. **순서대로 해금**되고 잠긴 줄에는 이유가 적힌다 (2.6절) |
 | 전투 씬 | ✅ 탑뷰 맵 · 유닛 · 체력바 · 로그 · 배속(1x/2x) · 나가기 |
 | 육성 패널 | ✅ 헛간 줄의 `[육성]` 버튼으로 연다 (먹이 · 훈련 3종 · 저장) |
 | 필드 케어 클릭 | ✅ **헛간으로 돌려보낸다** (육성 패널이 아니다) |
@@ -81,8 +83,9 @@
   좌표를 고정하면 완전히 결정적이다. 피해 = `공격 − 방어/2`, 최소 1.
   종마다 고유 스킬 1개(진화하면 바뀐다). 적 3종: 들쥐(8) / 가시멧돼지(18) / 바위골렘(40)
 - **전투는 케어에게 아무것도 남기지 않는다** — 깎인 체력은 전투 중에만 존재. 부상·사망 없음
-- **세이브 v3**: 보유 배열 + 파티 인덱스 + 대상 인덱스 + 재화.
-  **v2 이하는 새 게임으로 폴백**. 여전히 **기본 스탯만** 저장한다
+- **세이브 v4**: 보유 배열 + 파티 인덱스 + 대상 인덱스 + 재화 + **깬 스테이지 id**.
+  **v3 은 진행도만 빈 채로 승격**하고 **v2 이하는 새 게임으로 폴백**한다.
+  여전히 **기본 스탯만** 저장한다
 
 ### 2.3 화면 (측면 뷰)
 
@@ -98,7 +101,7 @@
 설계 근거는 **`docs/superpowers/specs/2026-08-14-battle-screen-design.md`**,
 구현 계획은 **`docs/superpowers/plans/2026-08-14-battle-screen.md`** 에 있다.
 
-- **별도 전투 씬**이다. 농장에서 인카운터를 고르면 `BattleScene` 으로 넘어가고,
+- **별도 전투 씬**이다. 농장에서 스테이지를 고르면 `BattleScene` 으로 넘어가고,
   [나가기]를 누르면 농장으로 돌아온다.
 - ~~**좌표는 표시 전용이다.**~~ → **2026-08-16 에 뒤집혔다. 2.5절을 본다.**
   그때는 시뮬레이터가 좌표를 안 읽어서 스폰이 랜덤이어도 결과가 같았고, 덕분에
@@ -144,6 +147,32 @@
   유닛을 고르기 때문**이다. 테스트 헬퍼 `Clustered(n)` 이 그 역할을 한다.
 
 **함정 3.12 를 함께 볼 것** — 밀어내기 간격이 사거리보다 넓으면 전투가 조용히 멎는다.
+
+### 2.6 맵 / 스테이지 진행 구조 (2026-08-16)
+
+설계 근거는 **`docs/superpowers/specs/2026-08-16-stage-progression-design.md`**,
+구현 계획은 **`docs/superpowers/plans/2026-08-16-stage-progression.md`** 에 있다.
+
+- **맵이 스테이지를 담는다.** `StageMap`{표시이름, `field`(전장), `stages`}, 목록은 `StageMapDatabase`.
+  스테이지는 기존 `BattleEncounter` 를 승격한 것이라 **`entries`(적·마리수) 리스트가 그대로다** —
+  몬스터 편집은 거기서 한다. `BattleEncounterDatabase` 는 **삭제됐다.**
+- **`stages` 의 순서가 곧 해금 순서다.**
+- **해금은 조건 목록이다** (`StageUnlock`, 전부 AND, 비면 항상 열림).
+  `PreviousStageCleared` / `StageCleared` / **`RequiresItem`**.
+  진화 조건(`EvolutionCondition`)과 같은 모양이라 새로 배울 것이 없다.
+  **나중에 들어올 드랍 아이템(지도·열쇠)이 `RequiresItem` 으로 그대로 물린다.**
+- **진행도는 `stageId` 문자열로 기록한다** (`StageProgress`). 인덱스로 두면 스테이지를
+  중간에 끼워 넣을 때 전부 밀린다. 대가로 **id 중복 금지**라는 불변조건이 생겼고,
+  `GameDataIntegrationTests.StageIds_AreUniqueAcrossAllMaps` 가 그것을 지킨다.
+- **세이브 v4.** `clearedStageIds` 가 늘었다. **v3 은 버리지 않고 승격**한다(진행도만 빈 채로).
+  v2 이하는 여전히 거부.
+- **진행도가 기록되는 지점은 `GameRoot.ApplyBattleResult` 한 곳뿐이다** — 재화와 같은 자리.
+  전투 씬은 결과에 `StageId` 를 실어 보낼 뿐이다. 연습 전투는 빈 id 라 아무것도 안 남는다.
+- **전장이 `StageMap` 으로 올라가면서** 전투 씬이 그것을 알 길이 끊겼다.
+  `BattleRequest.Field` 로 실어 보내고 **`request.Field → encounter.map → defaultMap`** 순으로 물러난다.
+- **화면은 고정 6칸을 두 모드가 번갈아 쓴다.** 맵 목록 ↔ 스테이지 목록.
+  **그래서 맵이 늘든 스테이지가 늘든 `BuildAll` 이 필요 없다** — 함정 3.1 을 정면으로 푸는 방법이다.
+  페이지는 그릴 것이 있을 때만 넘어가고, 모드를 바꾸면 0 으로 돌아간다.
 
 ---
 
@@ -255,7 +284,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 
 ### 3.11 전투 데이터는 seed-only 다 — 코드로 초기값을 바꿔도 반영되지 않는다 ★2026-08-14 에 추가
 
-`EnemyData` · `BattleMapData` · `BattleEncounter` · `BattleEncounterDatabase` 는
+`EnemyData` · `BattleMapData` · `BattleEncounter`(스테이지) · `StageMap` 은
 `LoadOrSeed` 로 만든다. **이미 있으면 손대지 않는다.** 인스펙터에서 만진 밸런스를
 보존하기 위한 것이지만(설계 2.2), 반대로 `GameBootstrap` 의 초기값을 고쳐도
 **기존 에셋에는 안 들어간다.**
@@ -311,12 +340,14 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 `ItemDatabase` 인덱스와 1:1 로 묶여 있어서, 알을 아이템과 같은 계통에 넣으면 창고에 알 행이
 생겨버리기 때문이다. 산 알은 인벤토리에 `egg_sprigling` 키로 쌓이지만 **창고에는 안 나타난다.**
 
-세이브 포맷은 **v3 그대로다** — 인벤토리가 문자열 키 기반이라 알 항목이 추가돼도 포맷을 안 바꿔도 된다.
+알은 세이브 포맷을 안 바꿨다 — 인벤토리가 문자열 키 기반이라 그대로 실린다.
+(포맷 자체는 2026-08-16 맵/스테이지 작업에서 v4 로 올랐다. 2.6절)
 
 **부화소도 들어왔다 — 해결됨 (2026-08-16).** 규칙은 `HatchService.TryHatch` 한 곳에 있다.
 **즉시 부화**(대기 시간 없음)이고, **검사를 전부 끝낸 뒤에 알을 소모한다** — 순서를 뒤집으면
 "알은 사라졌는데 케어는 없다" 가 실재한다. 상점(차감 먼저·지급 나중)과 순서만 반대이고 보장은 같다.
-세이브 포맷은 **v3 그대로다** — 부화가 바꾸는 인벤토리와 로스터를 v3 가 이미 저장한다.
+부화는 세이브 포맷을 안 바꿨다 — 부화가 건드리는 인벤토리와 로스터를 이미 저장하고 있었다.
+(포맷 자체는 맵/스테이지 작업에서 v4 로 올랐다. 2.6절)
 
 **대신 새 한계가 생겼다: 헛간 8마리가 차면 부화가 영구히 막힌다.** 케어를 내보내는 기능이 없어서,
 한 번 가득 차면 산 알이 인벤토리에 영영 쌓인다. 7절에서 **맵/스테이지 다음 순서**로 잡아 뒀다.
@@ -402,7 +433,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (205개, 2026-08-16)
+### 5.1 테스트 (238개, 2026-08-16)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -414,16 +445,16 @@ Unity.exe -batchmode -runTests \
 
 | 픽스처 | 개수 |  | 픽스처 | 개수 |
 |---|---|---|---|---|
-| `BattleSimulatorTests` | 31 | | `PanelLabelsTests` | 30 |
-| `CareActionsTests` | 18 | | `SaveSerializerTests` | 18 |
-| `GameDataIntegrationTests` | 16 | | `EvolutionEvaluatorTests` | 11 |
+| `BattleSimulatorTests` | 31 | | `PanelLabelsTests` | 35 |
+| `CareActionsTests` | 18 | | `SaveSerializerTests` | 22 |
+| `GameDataIntegrationTests` | 20 | | `EvolutionEvaluatorTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
-| `GameStateTests` | 8 | | `BattleDataTests` | 8 |
-| `SpawnPointPickerTests` | 7 | | `BattleHandoffTests` | 7 |
+| `GameStateTests` | 9 | | `BattleDataTests` | 10 |
+| `SpawnPointPickerTests` | 7 | | `BattleHandoffTests` | 9 |
 | `HatchServiceTests` | 7 | | `ShopDataTests` | 6 |
 | `ShopServiceTests` | 6 | | `DataLayerTests` | 5 |
 | `FarmLayoutTests` | 5 | | `PipelineSmokeTests` | 2 |
-| | | | **합계** | **205** |
+| | | | **합계** | **238** |
 
 > `BattleSimulatorTests` 가 8/16 위치 기반 전투 작업에서 **13 → 31** 로 늘었다.
 > **기존 13개는 단언이 하나도 안 바뀌었다** — 좌표만 `Clustered(n)` 으로 넘긴다 (2.5절).
@@ -461,7 +492,8 @@ Unity.exe -batchmode \
    **패널 6종(헛간·창고·육성·전투·상점·부화소)이 닫혀 있는지** / `battlePanel.encounterDatabase` /
    **`shopPanel.stockDatabase`·`shopPanel.eggDatabase` 배선** /
    **`hatchPanel.eggDatabase`·`careManager`·`titleText` 배선** / HUD 텍스트 /
-   버튼 리스너(**비활성 포함**) / 데이터 기반 버튼 개수(**상점 [구매] 버튼·판매 행 = `ShopStockDatabase.Count`**,
+   버튼 리스너(**비활성 포함**) / **전투터는 고정 6칸**(데이터 개수와 무관 — 스테이지를 늘려도 BuildAll 이 필요 없다) /
+   데이터 기반 버튼 개수(**상점 [구매] 버튼·판매 행 = `ShopStockDatabase.Count`**,
    **부화소 [부화] 버튼·알 행 = `EggDatabase.eggs.Count`**) /
    **건물 종류 5종이 한 번씩 다 있는가** / **진입점 배선**(상점 건물 → `ShopPanel`,
    전투터 건물 → `BattlePanel`, **부화소 건물 → `HatchPanel`**) /
@@ -515,11 +547,11 @@ Assets/
     Species/   Sprigling · Wildbeast · BlossomGuardian (.asset)
     Items/     HeartyFeed · IronGrain · BloomStone (.asset)
     Enemies/   FieldRat · ThornBoar · StoneGolem (.asset)      ← seed-only (함정 3.11)
-    Battle/    FieldMap · RatField · BoarThicket · GolemRidge  ← seed-only (함정 3.11)
+    Battle/    FieldMap(전장) · Field1~4(스테이지) · FieldStages(맵)   ← seed-only (함정 3.11)
     Eggs/      SpriglingEgg.asset                                        ← 8/15 신설
     Sprites/   Square.png (8×8) · Circle.png (64×64)   ← 실제 에셋이어야 한다
     SpeciesDatabase.asset · ItemDatabase.asset · EnemyDatabase.asset
-    BattleEncounterDatabase.asset                              ← seed-only
+    StageMapDatabase.asset                                     ← 코드가 전권 (8/16)
     EggDatabase.asset · ShopStockDatabase.asset                          ← 8/15 신설
   Scenes/FarmScene.unity            ← 손으로 편집하지 말 것. BuildAll 이 전량 생성
   Scenes/BattleScene.unity          ← 위와 같음
@@ -529,13 +561,16 @@ Assets/
                      SkillDefinition · EnemyData · EnemyDatabase
                      EvolutionRequirement · EvolutionCondition
                      SpeciesDatabase · ItemDatabase
-                     BattleMapData · BattleEncounter(+EncounterEntry) · BattleEncounterDatabase
+                     BattleMapData · BattleEncounter(+EncounterEntry) = 스테이지
                      EggData · EggDatabase · ShopStockDatabase(+ShopEntry/ShopEntryKind)  ← 8/15 신설
+                     StageUnlock(+StageUnlockKind) · StageMap · StageMapDatabase          ← 8/16 신설
+                     (BattleEncounterDatabase 는 8/16 에 삭제됨)
       Core/          CreatureInstance · Inventory · ActionResult · CareActions
                      EvolutionEvaluator · Roster · GameState
                      BattleUnit · BattleSimulator          ← 8/16 위치 기반으로 다시 씀 (2.5절)
                      SpawnPointPicker · BattleHandoff(+BattleConclusion/Request/Result)
                      SaveData · SaveSerializer
+                     StageProgress · StageUnlockEvaluator                                ← 8/16 신설
                      ShopService                                                          ← 8/15 신설, TryBuy 한 곳
                      HatchService                                                         ← 8/16 신설, TryHatch 한 곳
       Presentation/  GameRoot · CareManager · GameHud · UiFontApplier
@@ -546,7 +581,7 @@ Assets/
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
                      BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  19개 파일(픽스처 18 + TestFixtures 헬퍼), 테스트 205개
+    Tests/EditMode/  21개 파일(픽스처 20 + TestFixtures 헬퍼), 테스트 238개
     Tests/PlayMode/  BattleSceneSmokeTests — 씬을 실제로 로드해 돌린다, 테스트 7개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
@@ -558,11 +593,13 @@ docs/
   superpowers/specs/2026-08-15-shop-design.md               상점 설계 ✅ 구현됨
   superpowers/specs/2026-08-16-hatchery-design.md           부화소 설계 ✅ 구현됨
   superpowers/specs/2026-08-16-battle-melee-design.md       위치 기반 전투 설계 ✅ 구현됨
+  superpowers/specs/2026-08-16-stage-progression-design.md  맵/스테이지 설계 ✅ 구현됨
   superpowers/plans/2026-08-06-...-mvp.md             MVP 구현 계획 + 실행 기록
   superpowers/plans/2026-08-14-battle-screen.md       전투 화면 구현 계획 + 실행 기록
   superpowers/plans/2026-08-15-shop.md                상점 구현 계획(9 태스크) + 실행 기록
   superpowers/plans/2026-08-16-hatchery.md            부화소 구현 계획(7 태스크) + 실행 기록
   superpowers/plans/2026-08-16-battle-melee.md        위치 기반 전투 구현 계획(8 태스크) + 실행 기록
+  superpowers/plans/2026-08-16-stage-progression.md   맵/스테이지 구현 계획(10 태스크) + 실행 기록
 ```
 
 **씬을 손으로 편집하지 말 것.** `GameBootstrap.BuildAll()` 이 전부 생성하므로,
@@ -574,48 +611,33 @@ docs/
 
 ```
 ✅ 전투 + 전투 화면 (재화 획득)  ──▶  ✅ 상점 (알·장비 구매)
-                                          │
-                                          ├──▶  ✅ 부화소 (알 → 몬스터)
+   └ ✅ 위치 기반 교전                     │
+   └ ✅ 맵/스테이지 (순서대로 해금)         ├──▶  ✅ 부화소 (알 → 몬스터)
                                           │              │
                                           │              ▼
-                                          │         ✅ 헛간 ──▶ ⬜ 케어 방출  ← 0순위
+                                          │         ✅ 헛간 ──▶ ⬜ 케어 방출
                                           │
                                           └──▶  ✅ 창고
+
+           ⬜ 건물별 개별 씬  ← 0순위 (표현·전환 계층 전체)
 ```
 
 **MVP 순환이 닫혔다.** 전투로 재화를 벌고 → 상점에서 알을 사고 → 부화소에서 깨고 →
 헛간에서 키우고 → 다시 전투에 내보낸다. 모든 건물이 제 일을 한다.
 
-**0순위 — 맵/스테이지 + 건물 씬 분리 (한 프로젝트로 묶는다).** 사용자가 2026-08-16 에 요청했다.
+**0순위 — 건물별 개별 씬.** 맵/스테이지가 8/16 에 들어가면서 남은 절반이다.
 
-- **맵/스테이지**: 전투터에 들어가면 맵을 고르고, 맵마다 스테이지가 나뉜다.
-  지금은 `BattleEncounter` 가 맵을 **부속으로** 들고 있어(인카운터 3개가 각자 맵을 가리킨다)
-  맵이 상위가 되려면 `BattleEncounter`/`BattleEncounterDatabase` 계통을 다시 짜야 한다.
-  진행도(어디까지 깼나)를 저장할 거면 **세이브 v3 도 손댄다.**
-  - **요구사항 (2026-08-16 사용자): 스테이지의 몬스터 구성·마릿수를 인스펙터에서
-    리스트로 쉽게 편집할 수 있어야 한다.** 지금 `BattleEncounter` 는 `{적, 마리수}` 목록을
-    이미 리스트로 들고 있으니 그 모양을 살리되, **맵 → 스테이지 목록 → 적 구성**의
-    세 단계가 인스펙터에서 한눈에 보이고 항목을 늘리기 쉬워야 한다.
-    - 주의: **적 총원은 `BattleField.MaxEnemies`(8)를 넘을 수 없다** — 씬의 적 슬롯이
-      8개로 고정돼 있다(함정 3.1). 리스트로 쉽게 늘릴 수 있게 만들수록
-      **8을 넘겼을 때 크게 실패시키는 검사**가 같이 필요하다
-    - 주의: 이 계통 에셋들이 **seed-only** 라(함정 3.11) 구조를 바꾸면 `.asset` 을 지워야
-      새 초기값이 깔린다
-- **건물 씬**: 건물을 클릭하면 패널이 아니라 개별 씬으로 들어간다.
-  지금은 `FarmScene` 하나에 패널 6종이 얹혀 있고 `GameBootstrap` 이 전량 생성한다.
+지금은 `FarmScene` 하나에 패널 6종이 얹혀 있고 `GameBootstrap` 이 전량 생성한다.
+건물을 클릭하면 패널이 아니라 **개별 씬**으로 들어가게 바꾼다.
 
-**둘을 묶는 이유: 전투터가 개별 씬이 되면 그 씬이 곧 맵 선택 화면이다.** 따로 만들면
-같은 화면을 두 번 만들게 된다.
+> **가장 큰 위험은 씬 전환마다 "저장 안 한 진행이 날아가는" 자리가 새로 생기는 것이다.**
+> `BattleHandoff` 를 만든 이유가 정확히 그것인데(2.4절), 건물이 5개면 그 자리가 5곳이 된다.
+> 같은 패턴을 일반화한 전달자 하나로 묶는 설계가 필요하다.
+>
+> 전투터 화면(맵→스테이지 2단계)은 **행·버튼·문자열이 그대로 옮겨간다** — 그릇만 바뀐다.
 
-> 착수 전에 볼 것: `BattleMapData` 는 **seed-only** 라(함정 3.11) 구조를 바꾸려면 `.asset` 을
-> 지워야 한다. 위치 기반 전투 작업에서 이 데이터를 일부러 안 건드린 것이 이것 때문이다
-> (설계 5절) — 여기서 한 번에 다시 짠다.
-
-**미룬 것 — 케어 방출.** 부화소가 만든 한계다(4.3). 헛간 8마리가 차면 부화가 **영구히 막히고**
-산 알이 인벤토리에 영영 쌓인다. 8/16 에 한 번 0순위로 정했다가 위 요청이 들어와 뒤로 밀었다.
-
-> 주의: 함정 3.6 때문에 **보유 목록 순서를 바꿀 수 없다** — 헛간 버튼이 인덱스를 들고 있다.
-> 방출은 "목록에서 빼기"가 아니라 **빈 슬롯을 남기는** 방식이 되어야 할 가능성이 크다.
+**그다음 — 케어 방출.** 헛간 8마리가 차면 부화가 **영구히 막힌다**(4.3).
+함정 3.6 때문에 목록에서 빼는 것이 아니라 **빈 슬롯을 남기는** 방식이 유력하다.
 
 **나머지 후보**: 알 종류 추가 / 진화 선택 UI / 종별 사거리·이동속도.
 
@@ -629,7 +651,7 @@ docs/
 씬 없이 한 인카운터를 수천 번 돌릴 수 있다** — 이번 개편에서 공짜로 생긴 기회다.
 
 뽑을 표: 인카운터별 **승률 · 평균 소요 시간 · 아군 평균 잔여 체력**.
-파티 구성·장비 유무별로도 나눌 수 있다. `EnemyDatabase`·`BattleEncounterDatabase` 를
+파티 구성·장비 유무별로도 나눌 수 있다. `EnemyDatabase`·`StageMapDatabase` 를
 읽어 `-executeMethod` 로 돌리면 된다 (`SceneIntegrityCheck` 와 같은 방식).
 
 > 좌표를 주입해야 하므로 **하네스가 seed 를 굴려 여러 배치를 만들어야 한다** —
@@ -705,6 +727,16 @@ docs/
 - [x] **왕복해도 저장 전 진행이 남고 보상이 한 번만 들어온다**
 - [x] 파티가 빈 채로 인카운터를 누르면 씬이 바뀌지 않는다
 - [x] `BattleScene` 단독 Play 시 연습 전투로 시작하고 로그로 알린다
+
+**8/16 맵/스테이지 — 기계는 통과했지만 사람이 본 적이 없다**
+
+- [ ] 전투터를 열면 **맵 목록**이 뜬다 (지금은 맵이 하나뿐이라 한 줄)
+- [ ] 맵을 고르면 스테이지 목록으로 바뀌고 **[뒤로]**로 돌아온다
+- [ ] 잠긴 스테이지 줄에 **왜 잠겼는지**가 보이고, 눌러도 전투가 안 열린다
+- [ ] 들판 1 을 깨면 들판 2 가 열린다
+- [ ] 저장하고 껐다 켜도 진행도가 남는다
+- [ ] 스테이지가 6개를 넘을 때 [다음] 페이지가 동작한다 (지금은 4개라 확인하려면 에셋을 늘려야 함)
+- [ ] 스테이지 목록이 화면에 보기 좋은가 (6줄 + 버튼 4개가 1100×700 안에 들어오는가)
 
 **8/16 위치 기반 전투 — 2026-08-16 에 연습 전투를 Play 로 확인함**
 
