@@ -105,5 +105,30 @@ namespace FarmCreature.Tests
 
             Assert.AreEqual(8 * 3 + 18, encounter.TotalGoldReward);
         }
+
+        // ---------- 맵 / 스테이지 ----------
+
+        [Test]
+        public void NewEncounter_HasNoStageIdAndNoUnlockConditions()
+        {
+            var stage = ScriptableObject.CreateInstance<BattleEncounter>();
+
+            Assert.IsTrue(string.IsNullOrEmpty(stage.stageId), "id 는 에셋마다 지어준다");
+            Assert.IsNotNull(stage.unlock, "조건 목록은 null 이 아니라 빈 목록이다");
+            Assert.AreEqual(0, stage.unlock.Count, "조건이 없으면 항상 열림이다");
+        }
+
+        [Test]
+        public void StageMap_CountAndGet_AreSafeAtEdges()
+        {
+            var rat = TestFixtures.MakeEnemy("rat", maxHp: 8, attack: 3, defense: 1);
+            var first = TestFixtures.MakeStage("field_1", "들판 1", null, (rat, 2));
+            var map = TestFixtures.MakeStageMap("들쥐 들판", first);
+
+            Assert.AreEqual(1, map.Count);
+            Assert.AreSame(first, map.Get(0));
+            Assert.IsNull(map.Get(-1), "범위 밖은 예외가 아니라 null 이다");
+            Assert.IsNull(map.Get(1));
+        }
     }
 }

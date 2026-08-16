@@ -24,13 +24,19 @@ namespace FarmCreature.Data
     [CreateAssetMenu(fileName = "Encounter", menuName = "FarmCreature/Battle Encounter")]
     public class BattleEncounter : ScriptableObject
     {
+        [Tooltip("진행도가 이 id 로 기록된다. 전 맵을 통틀어 유일해야 한다. 한 번 정하면 바꾸지 말 것.")]
+        public string stageId;
+
         public string displayName = "들판";
 
         [Tooltip("등장하는 적과 그 수. 위에서부터 순서대로 나온다.")]
         public List<EncounterEntry> entries = new List<EncounterEntry>();
 
-        [Tooltip("이 전투에 쓸 맵. 비어 있으면 전투 씬의 기본 맵을 쓴다.")]
+        [Tooltip("이 스테이지만 다른 전장을 쓰고 싶을 때. 비어 있으면 맵(StageMap.field)이 정한다.")]
         public BattleMapData map;
+
+        [Tooltip("이 스테이지가 열리는 조건. 전부 AND. 비어 있으면 항상 열림.")]
+        public List<StageUnlock> unlock = new List<StageUnlock>();
 
         /// <summary>등장 적 총원. 빈 칸과 0 이하의 수는 세지 않는다.</summary>
         public int TotalEnemyCount
