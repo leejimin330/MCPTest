@@ -104,6 +104,30 @@ namespace FarmCreature.Presentation
         }
 
         /// <summary>
+        /// 양측이 함께 서는 전장. <b>아군 구역과 적 구역을 감싸는 사각형</b>이다 —
+        /// 난전이라 구역을 나누지 않는다 (설계 5절).
+        ///
+        /// <see cref="BattleMapData"/> 는 seed-only 라 건드리지 않는다 (함정 3.11).
+        /// 맵 데이터 자체는 다음 프로젝트(맵/스테이지)에서 다시 짠다.
+        ///
+        /// PlayMode 스모크 테스트가 이 메서드를 그대로 불러 검사한다 — 식이 갈라지면
+        /// 검사가 실제 배치와 다른 것을 보게 된다.
+        /// </summary>
+        public static Rect BattlefieldOf(BattleMapData map)
+        {
+            if (map == null)
+            {
+                return new Rect();
+            }
+
+            return Rect.MinMaxRect(
+                Mathf.Min(map.AllySpawnArea.xMin, map.EnemySpawnArea.xMin),
+                Mathf.Min(map.AllySpawnArea.yMin, map.EnemySpawnArea.yMin),
+                Mathf.Max(map.AllySpawnArea.xMax, map.EnemySpawnArea.xMax),
+                Mathf.Max(map.AllySpawnArea.yMax, map.EnemySpawnArea.yMax));
+        }
+
+        /// <summary>
         /// 스폰 좌표를 고른다. <b>여기서만 난수를 쓴다</b> — 시뮬레이터는 받은 좌표를 그대로 쓴다.
         /// 매 전투 배치가 달라야 하고, 이제 그것이 결과까지 바꾼다 (설계 3.1).
         /// </summary>
@@ -120,14 +144,7 @@ namespace FarmCreature.Presentation
                 return;
             }
 
-            // 두 구역을 감싸는 사각형이 전장이다. 양측을 여기에 섞어 뿌린다 (설계 5절).
-            // BattleMapData 는 seed-only 라 건드리지 않는다 — 맵 데이터는 다음 프로젝트에서 다시 짠다.
-            var battlefield = Rect.MinMaxRect(
-                Mathf.Min(map.AllySpawnArea.xMin, map.EnemySpawnArea.xMin),
-                Mathf.Min(map.AllySpawnArea.yMin, map.EnemySpawnArea.yMin),
-                Mathf.Max(map.AllySpawnArea.xMax, map.EnemySpawnArea.xMax),
-                Mathf.Max(map.AllySpawnArea.yMax, map.EnemySpawnArea.yMax));
-
+            var battlefield = BattlefieldOf(map);
             int seed = Random.Range(int.MinValue, int.MaxValue);
 
             // 한 번에 함께 뽑는다. 나눠 뽑으면 아군과 적 사이의 간격이 보장되지 않아

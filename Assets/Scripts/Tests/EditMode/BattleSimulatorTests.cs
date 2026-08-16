@@ -537,5 +537,98 @@ namespace FarmCreature.Tests
 
             Assert.AreEqual(500, battle.Enemies[0].Hp, "사거리 밖인데 스킬이 나갔다");
         }
+
+        // ---------- 결정성과 배치의 영향 ----------
+
+        [Test]
+        public void MinSpacing_IsTighterThanAttackRange()
+        {
+            Assert.Less(BattleSimulator.DefaultMinSpacing, BattleUnit.DefaultAttackRange,
+                "분리 간격이 사거리보다 넓으면 유닛이 붙기 전에 밀려나 영원히 못 때린다");
+        }
+
+        /// <summary>
+        /// 맵 데이터의 <c>minSpacing</c> 은 <b>스폰 간격</b>용이라 사거리와 무관하게 정해진다 —
+        /// 실제로 <c>FieldMap.asset</c> 은 1.4 이고 사거리는 1.2 다. 자르지 않으면 유닛이
+        /// 사거리 안에 들기 전에 서로 밀어내 <b>전투가 조용히 멎는다</b>
+        /// (2026-08-16 PlayMode 스모크가 실제로 이렇게 실패했다).
+        /// </summary>
+        [Test]
+        public void WideMapSpacing_DoesNotPreventFighting()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: 0.5f, cooldownSeconds: Never);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero, hero), new[] { dummy },
+                new List<Vector2> { new Vector2(-3f, 0f), new Vector2(-3f, 1.5f) },
+                new List<Vector2> { new Vector2(3f, 0f) },
+                minSpacing: 1.4f);   // FieldMap.asset 의 실제 값. 사거리(1.2)보다 넓다.
+
+            for (int i = 0; i < 100; i++)
+            {
+                battle.Tick(0.1f);
+            }
+
+            Assert.Less(battle.Enemies[0].Hp, 500,
+                "밀어내기가 접근을 이겨 아무도 못 때렸다 — minSpacing 을 사거리 기준으로 자르지 않았다");
+        }
+
+        [Test]
+        public void SamePositions_GiveTheSameLog()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 6, defense: 1, health: 40,
+                attackInterval: 1f, cooldownSeconds: 3f);
+            var foe = TestFixtures.MakeEnemy("foe", maxHp: 30, attack: 4, defense: 2,
+                attackInterval: 1.1f, goldReward: 5);
+
+            var allyAt = new List<Vector2> { new Vector2(-2f, 1f), new Vector2(-1f, -2f) };
+            var foeAt = new List<Vector2> { new Vector2(3f, 0f), new Vector2(4f, 2f) };
+
+            var first = new BattleSimulator(Party(hero, hero), new[] { foe, foe }, allyAt, foeAt);
+            var second = new BattleSimulator(Party(hero, hero), new[] { foe, foe }, allyAt, foeAt);
+
+            for (int i = 0; i < 200; i++)
+            {
+                first.Tick(0.1f);
+                second.Tick(0.1f);
+            }
+
+            Assert.AreEqual(first.Outcome, second.Outcome);
+            CollectionAssert.AreEqual(first.Log, second.Log,
+                "같은 좌표인데 로그가 다르다 — 시뮬레이터 안에 난수가 들어갔다");
+        }
+
+        [Test]
+        public void DifferentPositions_CanFlipTheResult()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 7, defense: 1, health: 30,
+                attackInterval: 1f, cooldownSeconds: Never);
+            var foe = TestFixtures.MakeEnemy("foe", maxHp: 22, attack: 5, defense: 1,
+                attackInterval: 1f, goldReward: 5);
+
+            // 붙어서 시작: 아군 둘이 함께 싸운다
+            var together = new BattleSimulator(
+                Party(hero, hero), new[] { foe, foe },
+                new List<Vector2> { new Vector2(0f, 0f), new Vector2(1f, 0f) },
+                new List<Vector2> { new Vector2(2f, 0f), new Vector2(3f, 0f) });
+
+            // 갈라져서 시작: 한 명이 멀리 떨어져 늦게 합류한다
+            var split = new BattleSimulator(
+                Party(hero, hero), new[] { foe, foe },
+                new List<Vector2> { new Vector2(0f, 0f), new Vector2(-30f, 0f) },
+                new List<Vector2> { new Vector2(2f, 0f), new Vector2(3f, 0f) });
+
+            for (int i = 0; i < 400; i++)
+            {
+                together.Tick(0.1f);
+                split.Tick(0.1f);
+            }
+
+            Assert.AreNotEqual(together.ElapsedSeconds, split.ElapsedSeconds,
+                "배치를 바꿔도 전투가 똑같이 흘렀다 — 좌표가 결과에 영향을 주지 않는다");
+        }
     }
 }

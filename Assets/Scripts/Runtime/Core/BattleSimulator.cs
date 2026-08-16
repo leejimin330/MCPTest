@@ -34,6 +34,16 @@ namespace FarmCreature.Core
         /// </summary>
         public const float DefaultMinSpacing = 0.9f;
 
+        /// <summary>
+        /// 밀어내기 간격이 사거리의 이 비율을 넘지 못하게 자른다.
+        /// <b>넘으면 유닛이 사거리 안에 들기 전에 서로 밀어내 영원히 못 때린다.</b>
+        ///
+        /// 맵 데이터(<c>BattleMapData.minSpacing</c>)는 <b>스폰 간격</b>을 위한 값이라
+        /// 사거리와 무관하게 정해진다 — 실제로 <c>FieldMap</c> 은 1.4 이고 사거리는 1.2 다.
+        /// 데이터 규율에 기대면 조용히 전투가 멎으므로 규칙 쪽에서 잘라낸다.
+        /// </summary>
+        private const float MaxSpacingToRangeRatio = 0.75f;
+
         private readonly List<BattleUnit> allies = new List<BattleUnit>();
         private readonly List<BattleUnit> enemies = new List<BattleUnit>();
         private readonly List<string> log = new List<string>();
@@ -76,8 +86,6 @@ namespace FarmCreature.Core
             IList<Vector2> enemyPositions,
             float minSpacing = DefaultMinSpacing)
         {
-            this.minSpacing = minSpacing;
-
             if (party != null)
             {
                 for (int i = 0; i < party.Count; i++)
@@ -102,6 +110,9 @@ namespace FarmCreature.Core
                 }
             }
 
+            // 유닛이 다 만들어진 뒤에 정한다 — 사거리를 알아야 자를 수 있다.
+            this.minSpacing = ClampSpacing(minSpacing, allies, enemies);
+
             // 좌표는 Resolve 보다 먼저 선다 — 규칙이 좌표를 읽기 때문이다.
             Place(allies, allyPositions);
             Place(enemies, enemyPositions);
@@ -117,6 +128,39 @@ namespace FarmCreature.Core
             {
                 Append("내보낼 케어가 없다.");
             }
+        }
+
+        /// <summary>
+        /// 요청된 간격을 <b>가장 짧은 사거리</b> 기준으로 자른다.
+        /// 자르지 않으면 밀어내기가 접근을 이겨 전투가 조용히 멎는다
+        /// (<see cref="MaxSpacingToRangeRatio"/> 참고).
+        /// </summary>
+        private static float ClampSpacing(float requested, List<BattleUnit> a, List<BattleUnit> b)
+        {
+            float smallestRange = float.MaxValue;
+            smallestRange = SmallestRange(a, smallestRange);
+            smallestRange = SmallestRange(b, smallestRange);
+
+            if (smallestRange == float.MaxValue)
+            {
+                return requested;   // 유닛이 없다. 자를 기준도 없다.
+            }
+
+            float ceiling = smallestRange * MaxSpacingToRangeRatio;
+            return requested < ceiling ? requested : ceiling;
+        }
+
+        private static float SmallestRange(List<BattleUnit> units, float current)
+        {
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (units[i].AttackRange < current)
+                {
+                    current = units[i].AttackRange;
+                }
+            }
+
+            return current;
         }
 
         /// <summary>
