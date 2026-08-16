@@ -491,6 +491,57 @@ namespace FarmCreature.Tests
                 "겹친 좌표는 방향이 없다 — 지어내면 숨은 난수가 된다");
         }
 
+        /// <summary>
+        /// 여럿이 한 상대에게 몰리면 <b>전원이 사거리에서 멈추므로</b> 밀어내기가 이동 중인
+        /// 유닛에만 걸리면 아무도 안 밀려나 그대로 포개진다. 2026-08-16 에 Play 로 확인한
+        /// 실제 증상이다 — 들쥐 셋 중 둘이 0.20 까지 겹쳐 한 마리가 완전히 숨었다 (HANDOFF 4.8).
+        /// </summary>
+        [Test]
+        public void UnitsConvergingOnOneTarget_DoNotStack()
+        {
+            // 아무도 죽지 않게 체력을 크게 잡는다. 여기서 볼 것은 피해가 아니라 배치다.
+            var hero = TestFixtures.MakeFighter("hero", attack: 1, defense: 0, health: 100000,
+                attackInterval: Never, cooldownSeconds: Never);
+            var foe = TestFixtures.MakeEnemy("foe", maxHp: 100000, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { foe, foe, foe },
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2>
+                {
+                    new Vector2(4f, 0f), new Vector2(4.1f, 0.1f), new Vector2(4.2f, -0.1f)
+                });
+
+            for (int i = 0; i < 300; i++)
+            {
+                battle.Tick(0.1f);
+            }
+
+            for (int i = 0; i < battle.Enemies.Count; i++)
+            {
+                for (int j = i + 1; j < battle.Enemies.Count; j++)
+                {
+                    float gap = Vector2.Distance(
+                        battle.Enemies[i].Position, battle.Enemies[j].Position);
+
+                    Assert.Greater(gap, 0.8f,
+                        "적 " + i + " 와 " + j + " 가 겹쳤다 (간격 " + gap.ToString("F2") + ") — "
+                        + "사거리에서 멈춘 유닛이 서로를 밀어내지 않는다");
+                }
+            }
+
+            // 겹침을 풀겠다고 사거리 밖으로 밀려나면 안 된다 — 그러면 다시 다가오며 떨린다.
+            for (int i = 0; i < battle.Enemies.Count; i++)
+            {
+                float toTarget = Vector2.Distance(
+                    battle.Enemies[i].Position, battle.Allies[0].Position);
+
+                Assert.LessOrEqual(toTarget, battle.Enemies[i].AttackRange + 0.001f,
+                    "적 " + i + " 가 사거리 밖으로 밀려났다 (" + toTarget.ToString("F2") + ")");
+            }
+        }
+
         // ---------- 스킬 사거리 ----------
 
         [Test]

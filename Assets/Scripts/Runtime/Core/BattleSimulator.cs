@@ -250,6 +250,10 @@ namespace FarmCreature.Core
                     continue;
                 }
 
+                // 멈춰 싸우는 중에도 겹침은 푼다. 여럿이 한 상대에게 몰리면 전원이 여기서
+                // 멈추므로, 이동 중에만 밀어내면 아무도 안 밀려나 그대로 포개진다 (HANDOFF 4.8).
+                SlideApartWithinRange(unit, target, side, opponents, deltaTime);
+
                 int swings = 0;
                 while (unit.AttackTimer >= unit.AttackInterval
                        && swings < MaxActionsPerTickPerUnit
@@ -320,11 +324,50 @@ namespace FarmCreature.Core
         }
 
         /// <summary>
+        /// 사거리 안에서 멈춘 유닛이 겹쳤을 때 <b>옆으로 미끄러뜨린다.</b>
+        ///
+        /// <b>타겟의 사거리 밖으로는 절대 나가지 않는다</b> — 이것이 떨림을 막는 핵심이다.
+        /// 밀렸다가 사거리를 벗어나면 다음 틱에 다시 다가오게 되어 안팎을 오간다.
+        /// 밀린 자리가 사거리를 벗어나면 <b>사거리 원 위로 당겨 붙인다.</b>
+        /// 그래서 유닛들은 타겟을 둘러싸듯 원을 따라 퍼진다.
+        /// </summary>
+        private void SlideApartWithinRange(
+            BattleUnit unit, BattleUnit target,
+            List<BattleUnit> side, List<BattleUnit> opponents, float deltaTime)
+        {
+            Vector2 push = Separation(unit, side, opponents);
+            if (push.sqrMagnitude <= 0f)
+            {
+                return;
+            }
+
+            Vector2 candidate = unit.Position + push * deltaTime;
+            Vector2 fromTarget = candidate - target.Position;
+            float distance = fromTarget.magnitude;
+
+            if (distance <= unit.AttackRange)
+            {
+                unit.Position = candidate;
+                return;
+            }
+
+            // 타겟 위에 정확히 올라섰다면 방향이 없다. 그대로 둔다 (설계 4절과 같은 이유).
+            if (distance <= 0f)
+            {
+                return;
+            }
+
+            unit.Position = target.Position + fromTarget / distance * unit.AttackRange;
+        }
+
+        /// <summary>
         /// <see cref="minSpacing"/> 안에 들어온 다른 살아있는 유닛들에게서 밀려나는 성분.
         /// 아군·적을 가리지 않는다 — 겹쳐 보이는 것은 편을 안 가린다.
         ///
-        /// <b>이동하는 유닛에만 적용된다</b> — 이미 멈춰 싸우는 유닛까지 밀면
-        /// 사거리 안팎을 오가며 떨린다 (설계 4절).
+        /// <b>이동 중이든 멈췄든 적용된다.</b> 처음에는 이동 중에만 걸었는데
+        /// (멈춘 유닛까지 밀면 사거리 안팎을 오가며 떨릴 것을 걱정했다),
+        /// 여럿이 한 상대에게 몰리면 전원이 사거리에서 멈춰 아무도 안 밀려나 포개졌다.
+        /// 떨림은 <see cref="SlideApartWithinRange"/> 가 사거리 안에 가두는 것으로 막는다.
         /// </summary>
         private Vector2 Separation(BattleUnit unit, List<BattleUnit> side, List<BattleUnit> opponents)
         {

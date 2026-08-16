@@ -19,7 +19,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **203/203 통과** (2026-08-16, 187 + 위치 기반 전투 16) |
+| EditMode 테스트 | **204/204 통과** (2026-08-16, 187 + 위치 기반 전투 17) |
 | PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절). **스폰이 랜덤이라 세 번 연속 통과로 확인했다** |
 | 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
 | 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동이 전부 패널을 연다**, 패널 6종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel), 건물 x 좌표가 맵 안 |
@@ -345,11 +345,11 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 클램프에 걸려 가장자리에 붙어 서고 도착 판정도 안 서던 문제였다. 이제 **맵 안쪽**
 (`FarmArea.HalfWidth − 2`)을 목표로 잡도록 고쳤다. 맵을 15로 넓히면서 함께 손봤다.
 
-### 4.8 멈춘 유닛끼리 겹친다 ★2026-08-16 에 Play 로 확인함
+### 4.8 멈춘 유닛끼리 겹친다 — **해결됨 (2026-08-16)**
 
-**밀어내기가 이동 중인 유닛에만 걸린다**(설계 4절). 멈춘 유닛까지 밀면 사거리 안팎을
-오가며 떨릴 것을 걱정한 결정인데, **같은 적에게 몰리면 전원이 사거리에서 멈추므로
-아무도 안 밀려나 그대로 포개진다.**
+밀어내기를 **이동 중인 유닛에만** 걸었던 것이 원인이었다(설계 4절). 멈춘 유닛까지 밀면
+사거리 안팎을 오가며 떨릴 것을 걱정한 결정인데, **같은 적에게 몰리면 전원이 사거리에서
+멈추므로 아무도 안 밀려나 그대로 포개졌다.**
 
 연습 전투(들쥐 3 + 스프리글링 1)를 실제로 돌려 잰 값:
 
@@ -360,14 +360,19 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 간격 EnemySlot0 ↔ AllySlot0  = 1.20
 ```
 
-들쥐 한 마리가 다른 마리 뒤에 완전히 숨어 **3마리가 2마리로 보인다.**
+들쥐 한 마리가 다른 마리 뒤에 완전히 숨어 **3마리가 2마리로 보였다.**
 
-**고칠 방향 후보**
-1. 멈춘 유닛도 밀어내되, **사거리 안으로는 안 밀리게 상한**을 둔다 (떨림 없이 겹침만 해소)
-2. 같은 타겟을 노리는 유닛들을 타겟 주위 **각도로 나눠** 세운다 (포위 그림이 나온다)
-3. 사거리를 유닛 크기보다 넉넉히 키운다 (가장 싸지만 붙는 맛이 준다)
+**대응 — `BattleSimulator.SlideApartWithinRange`**
 
-**함께 보이는 것 둘** (같은 자리에서 관찰됨)
+멈춘 유닛도 밀어내되 **타겟의 사거리 밖으로는 절대 안 나가게** 가둔다. 밀린 자리가
+사거리를 벗어나면 **사거리 원 위로 당겨 붙인다.** 그래서 유닛들은 타겟을 둘러싸듯
+원을 따라 퍼지고, 사거리를 벗어난 적이 없으니 **다시 다가올 일도 없어 떨리지 않는다.**
+
+`UnitsConvergingOnOneTarget_DoNotStack` 이 이것을 고정한다 — 적 셋이 아군 하나에게
+몰리는 실제 상황을 재현해 **간격이 0.8 을 넘는지**와 **아무도 사거리 밖으로 안 밀려났는지**를
+함께 단언한다. 고치기 전에는 0.44 로 실패했다.
+
+**아직 남은 것 둘** (같은 자리에서 관찰됨)
 - **이름표가 겹쳐 읽을 수 없다.** `TextMesh` 라 자동 회피가 없다
 - **전장의 일부만 쓴다.** 전장은 x[−7..7]·y[−3.25..2.25] 인데 전투가 한 구석에서 끝난다.
   유닛이 서로에게 수렴하므로 자연스러운 결과지만, 넓은 맵이 낭비된다
@@ -384,7 +389,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (203개, 2026-08-16)
+### 5.1 테스트 (204개, 2026-08-16)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -396,7 +401,7 @@ Unity.exe -batchmode -runTests \
 
 | 픽스처 | 개수 |  | 픽스처 | 개수 |
 |---|---|---|---|---|
-| `BattleSimulatorTests` | 29 | | `PanelLabelsTests` | 30 |
+| `BattleSimulatorTests` | 30 | | `PanelLabelsTests` | 30 |
 | `CareActionsTests` | 18 | | `SaveSerializerTests` | 18 |
 | `GameDataIntegrationTests` | 16 | | `EvolutionEvaluatorTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
@@ -405,9 +410,9 @@ Unity.exe -batchmode -runTests \
 | `HatchServiceTests` | 7 | | `ShopDataTests` | 6 |
 | `ShopServiceTests` | 6 | | `DataLayerTests` | 5 |
 | `FarmLayoutTests` | 5 | | `PipelineSmokeTests` | 2 |
-| | | | **합계** | **203** |
+| | | | **합계** | **204** |
 
-> `BattleSimulatorTests` 가 8/16 위치 기반 전투 작업에서 **13 → 29** 로 늘었다.
+> `BattleSimulatorTests` 가 8/16 위치 기반 전투 작업에서 **13 → 30** 로 늘었다.
 > **기존 13개는 단언이 하나도 안 바뀌었다** — 좌표만 `Clustered(n)` 으로 넘긴다 (2.5절).
 >
 > 같은 날 부화소 작업에서 `HatchServiceTests`(7) 가 생기고
@@ -528,7 +533,7 @@ Assets/
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
                      BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  19개 파일(픽스처 18 + TestFixtures 헬퍼), 테스트 203개
+    Tests/EditMode/  19개 파일(픽스처 18 + TestFixtures 헬퍼), 테스트 204개
     Tests/PlayMode/  BattleSceneSmokeTests — 씬을 실제로 로드해 돌린다, 테스트 7개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
@@ -667,8 +672,9 @@ docs/
 
 - [x] 유닛이 서로에게 **걸어가서 붙고**, 사거리에서 멈춰 싸운다. 스킬도 나간다
 - [x] 승패가 판정되고 로그가 읽을 만한 속도로 흐른다. 한글이 깨지지 않는다
-- [ ] ❌ **같은 상대에게 몰리면 겹친다.** 들쥐 둘 간격 0.20 — 한 마리가 완전히 숨는다 (4.8)
-- [ ] ❌ **이름표가 겹쳐 읽을 수 없다** (4.8)
+- [~] **겹침은 코드로 고쳤다 (4.8).** 테스트는 통과하지만 **눈으로 다시 볼 것** —
+      타겟을 둘러싸는 그림이 실제로 보기 좋은가
+- [ ] ❌ **이름표가 겹쳐 읽을 수 없다** (4.8) — 유닛이 벌어져 나아졌을지 함께 확인
 - [ ] ⚠️ **전장의 일부만 쓴다** — 넷 다 한 구석에 몰렸다 (4.8)
 - [ ] 같은 파티로 다시 싸우면 **결과가 달라진다** (배치 운이 재미로 느껴지는가, 억울한가)
 - [ ] 위아래로 움직여도 앞뒤 가림이 자연스럽다 — 겹침 때문에 아직 판단 불가
