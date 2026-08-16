@@ -66,7 +66,7 @@ namespace FarmCreature.EditorTools
             var speciesDb = BuildSpeciesDatabase(species);
             var itemDb = BuildItemDatabase(items);
             BuildEnemyDatabase(enemies);
-            var encounterDb = BuildBattleDataAssets(enemies);
+            var stageDb = BuildBattleDataAssets(enemies);
 
             var eggs = BuildEggAssets(species);
             var eggDb = BuildEggDatabase(eggs);
@@ -75,7 +75,7 @@ namespace FarmCreature.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            BuildFarmScene(farmScene, speciesDb, itemDb, encounterDb, eggDb, shopStock,
+            BuildFarmScene(farmScene, speciesDb, itemDb, stageDb, eggDb, shopStock,
                 species["sprigling"], items);
 
             // ★ 두 번째 NewScene 이 위에서 얻은 참조를 '다시' 죽인다 (함정 3.9와 같은 원리).
@@ -85,7 +85,7 @@ namespace FarmCreature.EditorTools
 
             ReloadSpriteAssets();
             var battleMap = AssetDatabase.LoadAssetAtPath<BattleMapData>(BattleDir + "/FieldMap.asset");
-            var practiceEncounter = AssetDatabase.LoadAssetAtPath<BattleEncounter>(BattleDir + "/RatField.asset");
+            var practiceEncounter = AssetDatabase.LoadAssetAtPath<BattleEncounter>(BattleDir + "/Field1.asset");
             var practiceSpecies = AssetDatabase.LoadAssetAtPath<CreatureSpeciesData>(SpeciesDir + "/Sprigling.asset");
 
             if (battleMap == null || practiceEncounter == null || practiceSpecies == null)
@@ -432,7 +432,7 @@ namespace FarmCreature.EditorTools
         /// 전투 맵과 인카운터를 <b>seed-only</b> 로 깐다 (설계 2.2).
         /// 맵은 하나(들판)만 만든다 — 맵이 늘어나면 인카운터에서 골라 쓰면 된다 (설계 8.4).
         /// </summary>
-        private static BattleEncounterDatabase BuildBattleDataAssets(List<EnemyData> enemies)
+        private static StageMapDatabase BuildBattleDataAssets(List<EnemyData> enemies)
         {
             bool created;
 
@@ -450,82 +450,138 @@ namespace FarmCreature.EditorTools
                 EditorUtility.SetDirty(fieldMap);
             }
 
-            // 적 3종을 그대로 세 판으로 나눈다. 마리 수로 난이도를 벌린다 —
-            // 들쥐는 떼로, 골렘은 한 마리로. 총원은 BattleField.MaxEnemies 를 넘지 않는다.
-            var ratField = SeedEncounter(BattleDir + "/RatField.asset",
-                "들판 — 들쥐 떼", fieldMap, enemies[0], 3);
-            var boarThicket = SeedEncounter(BattleDir + "/BoarThicket.asset",
-                "덤불 — 가시멧돼지", fieldMap, enemies[1], 2);
-            var golemRidge = SeedEncounter(BattleDir + "/GolemRidge.asset",
-                "바위 언덕 — 바위골렘", fieldMap, enemies[2], 1);
+            // 마리 수와 종류로 난이도를 벌린다. 총원은 BattleField.MaxEnemies 를 넘지 않는다.
+            // 이 수치는 난이도 곡선을 잡은 값이 아니라 자리를 채운 씨앗이다 —
+            // 밸런스는 개발이 끝난 뒤에 잡는다 (설계 7절).
+            var s1 = SeedStage(BattleDir + "/Field1.asset", "field_1", "들판 1", false,
+                new[] { (enemies[0], 2) });
+            var s2 = SeedStage(BattleDir + "/Field2.asset", "field_2", "들판 2", true,
+                new[] { (enemies[0], 3) });
+            var s3 = SeedStage(BattleDir + "/Field3.asset", "field_3", "들판 3", true,
+                new[] { (enemies[1], 1), (enemies[0], 2) });
+            var s4 = SeedStage(BattleDir + "/Field4.asset", "field_4", "들판 4", true,
+                new[] { (enemies[2], 1) });
 
-            var db = LoadOrSeed<BattleEncounterDatabase>(
-                DataRoot + "/BattleEncounterDatabase.asset", out created);
+            var map = LoadOrSeed<StageMap>(BattleDir + "/FieldStages.asset", out created);
             if (created)
             {
-                db.encounters = new List<BattleEncounter> { ratField, boarThicket, golemRidge };
-                EditorUtility.SetDirty(db);
+                map.displayName = "들쥐 들판";
+                map.field = fieldMap;
+                map.stages = new List<BattleEncounter> { s1, s2, s3, s4 };
+                EditorUtility.SetDirty(map);
             }
 
-            ValidateEncounters(db);
+            // 데이터베이스는 코드가 전권을 쥔다 — 맵 목록은 밸런스가 아니다.
+            var db = LoadOrCreate<StageMapDatabase>(DataRoot + "/StageMapDatabase.asset");
+            db.maps = new List<StageMap> { map };
+            EditorUtility.SetDirty(db);
+
+            ValidateStages(db);
             return db;
         }
 
-        private static BattleEncounter SeedEncounter(
-            string assetPath, string displayName, BattleMapData map, EnemyData enemy, int count)
+        /// <summary>
+        /// 스테이지 하나를 깐다. <paramref name="gatedByPrevious"/> 가 true 면
+        /// 바로 앞 스테이지를 깨야 열린다.
+        /// <c>map</c> 은 비워 둔다 — 전장은 <see cref="StageMap"/> 이 정한다 (설계 2.1).
+        /// </summary>
+        private static BattleEncounter SeedStage(
+            string assetPath, string stageId, string displayName, bool gatedByPrevious,
+            (EnemyData enemy, int count)[] entries)
         {
             bool created;
-            var encounter = LoadOrSeed<BattleEncounter>(assetPath, out created);
+            var stage = LoadOrSeed<BattleEncounter>(assetPath, out created);
 
             if (created)
             {
-                encounter.displayName = displayName;
-                encounter.map = map;
-                encounter.entries = new List<EncounterEntry>
+                stage.stageId = stageId;
+                stage.displayName = displayName;
+                stage.map = null;
+                stage.entries = new List<EncounterEntry>();
+
+                for (int i = 0; i < entries.Length; i++)
                 {
-                    new EncounterEntry { enemy = enemy, count = count }
-                };
-                EditorUtility.SetDirty(encounter);
+                    stage.entries.Add(new EncounterEntry
+                    {
+                        enemy = entries[i].enemy,
+                        count = entries[i].count
+                    });
+                }
+
+                stage.unlock = new List<StageUnlock>();
+                if (gatedByPrevious)
+                {
+                    stage.unlock.Add(new StageUnlock
+                    {
+                        kind = StageUnlockKind.PreviousStageCleared
+                    });
+                }
+
+                EditorUtility.SetDirty(stage);
             }
 
-            return encounter;
+            return stage;
         }
 
         /// <summary>
-        /// 인카운터의 적 총원이 씬 슬롯 수를 넘으면 <b>크게 실패시킨다.</b>
-        /// 조용히 잘라내면 인스펙터에 8마리 넘게 적어놓고 왜 안 나오는지 모르게 된다 (설계 4.3).
+        /// 데이터 실수를 <b>크게 실패시킨다.</b> 조용히 넘기면 전투터가 빈 화면이 되거나
+        /// 진행도가 엉뚱하게 기록된다 (설계 4.3).
         /// </summary>
-        private static void ValidateEncounters(BattleEncounterDatabase db)
+        private static void ValidateStages(StageMapDatabase db)
         {
             if (db == null || db.Count == 0)
             {
-                Debug.LogError("[FarmCreature] 인카운터가 0개다. 전투터에 버튼이 하나도 생기지 않는다. "
-                    + "BattleEncounterDatabase 참조가 죽었는지(NewScene 이후 로드했는지) 확인할 것. "
+                Debug.LogError("[FarmCreature] 맵이 0개다. 전투터가 빈 화면이 된다. "
+                    + "StageMapDatabase 참조가 죽었는지(NewScene 이후 로드했는지) 확인할 것. "
                     + "db==null? " + (db == null));
                 return;
             }
 
-            for (int i = 0; i < db.Count; i++)
+            var seenIds = new HashSet<string>();
+
+            for (int m = 0; m < db.Count; m++)
             {
-                var encounter = db.Get(i);
-                if (encounter == null)
+                var map = db.Get(m);
+                if (map == null || map.field == null)
                 {
-                    Debug.LogError("[FarmCreature] 인카운터 " + i + " 번이 비어 있다.");
+                    Debug.LogError("[FarmCreature] " + m + "번 맵이 비었거나 전장이 없다.");
                     continue;
                 }
 
-                if (encounter.TotalEnemyCount > BattleField.MaxEnemies)
+                for (int s = 0; s < map.Count; s++)
                 {
-                    Debug.LogError("[FarmCreature] 인카운터 '" + encounter.displayName + "' 의 적이 "
-                        + encounter.TotalEnemyCount + "마리다. 슬롯은 "
-                        + BattleField.MaxEnemies + "개뿐이다. "
-                        + "적을 줄이거나 BattleField.MaxEnemies 를 올리고 BuildAll 을 다시 돌릴 것.");
-                }
+                    var stage = map.Get(s);
+                    if (stage == null)
+                    {
+                        Debug.LogError("[FarmCreature] " + map.displayName + " 의 "
+                            + s + "번 스테이지가 비었다.");
+                        continue;
+                    }
 
-                if (encounter.TotalEnemyCount == 0)
-                {
-                    Debug.LogError("[FarmCreature] 인카운터 '" + encounter.displayName
-                        + "' 에 적이 없다. 눌러도 아무 일도 일어나지 않는다.");
+                    // 진행도가 id 로 기록되므로, 비었거나 겹치면 조용히 틀린다 (설계 1.1).
+                    if (string.IsNullOrEmpty(stage.stageId))
+                    {
+                        Debug.LogError("[FarmCreature] '" + stage.displayName
+                            + "' 에 stageId 가 없다 — 진행도를 기록할 수 없다.");
+                    }
+                    else if (!seenIds.Add(stage.stageId))
+                    {
+                        Debug.LogError("[FarmCreature] stageId 가 겹친다: " + stage.stageId
+                            + " — 하나를 깨면 다른 것도 깬 것이 된다.");
+                    }
+
+                    if (stage.TotalEnemyCount > BattleField.MaxEnemies)
+                    {
+                        Debug.LogError("[FarmCreature] '" + stage.displayName + "' 의 적이 "
+                            + stage.TotalEnemyCount + "마리다. 슬롯은 "
+                            + BattleField.MaxEnemies + "개뿐이라 나머지는 안 나온다.");
+                    }
+
+                    if (stage.TotalEnemyCount == 0)
+                    {
+                        Debug.LogError("[FarmCreature] '" + stage.displayName
+                            + "' 에 적이 없다. 눌러도 아무 일도 일어나지 않는다.");
+                    }
                 }
             }
         }
@@ -611,7 +667,7 @@ namespace FarmCreature.EditorTools
             UnityEngine.SceneManagement.Scene scene,
             SpeciesDatabase speciesDb,
             ItemDatabase itemDb,
-            BattleEncounterDatabase encounterDb,
+            StageMapDatabase stageDb,
             EggDatabase eggDb,
             ShopStockDatabase shopStock,
             CreatureSpeciesData startingSpecies,
@@ -740,7 +796,7 @@ namespace FarmCreature.EditorTools
             var storagePanel = BuildStoragePanel(panelRoot.transform, careManager, itemDb);
             var raisingPanel = BuildRaisingPanel(panelRoot.transform, careManager);
             var barnPanel = BuildBarnPanel(panelRoot.transform, careManager);
-            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager);
+            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, stageDb, itemDb);
             var shopPanel = BuildShopPanel(panelRoot.transform, careManager, shopStock, eggDb);
             var hatchPanel = BuildHatchPanel(panelRoot.transform, careManager, eggDb);
 
@@ -1324,24 +1380,61 @@ namespace FarmCreature.EditorTools
         }
 
         /// <summary>
-        /// 전투터 패널(상점 건물에 임시로 붙어 있다 — HANDOFF 4.1).
-        /// 인카운터 버튼은 <see cref="BattleEncounterDatabase"/> 인덱스를 넘기고,
-        /// 전투 자체는 <see cref="BattleSceneRoot"/> 가 별도 씬에서 굴린다.
-        /// </summary>
-        /// <summary>
-        /// TASK 8 임시 스텁 — 무결성 검사가 실패하는 것을 보기 위해 최소만 만든다.
-        /// Task 9 에서 6칸 + 페이지 버튼으로 제대로 채운다.
+        /// 전투터 패널. <b>행은 항상 6개다</b> — 데이터 개수와 무관하다.
+        /// 맵 모드와 스테이지 모드가 같은 6칸을 번갈아 쓰므로, 맵이 늘든 스테이지가 늘든
+        /// 씬은 그대로다 (함정 3.1 을 정면으로 푸는 방법, 설계 5절).
+        /// 줄 버튼은 <b>int 인자 persistent listener</b> 로 줄 번호를 넘긴다 (함정 3.6).
         /// </summary>
         private static BattlePanel BuildBattlePanel(
-            Transform parent, CareManager careManager)
+            Transform parent, CareManager careManager,
+            StageMapDatabase stageDb, ItemDatabase itemDb)
         {
             var panelGo = CreatePanelBackground(parent, "BattlePanel", new Vector2(1100f, 700f));
             var panel = panelGo.AddComponent<BattlePanel>();
+            panel.stageDatabase = stageDb;
+            panel.itemDatabase = itemDb;
             panel.careManager = careManager;
 
             panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 300f),
                 new Vector2(1040f, 50f), TextAnchor.MiddleCenter, 34, Color.white);
             panel.titleText.text = "전투터";
+
+            panel.infoText = CreatePanelText(panelGo.transform, "Info", new Vector2(0f, 245f),
+                new Vector2(1040f, 44f), TextAnchor.MiddleCenter, 24, new Color(0.85f, 0.85f, 0.7f));
+
+            var rows = new Text[BattlePanel.RowsPerPage];
+            float rowY = 175f;
+
+            for (int i = 0; i < BattlePanel.RowsPerPage; i++)
+            {
+                rows[i] = CreatePanelText(panelGo.transform, "Row" + i, new Vector2(-120f, rowY),
+                    new Vector2(700f, 50f), TextAnchor.MiddleLeft, 24, Color.white);
+
+                var selectButton = CreatePanelButton(panelGo.transform, "Select" + i, "선택",
+                    new Vector2(380f, rowY), new Vector2(150f, 54f),
+                    new Color(0.68f, 0.36f, 0.34f));
+                UnityEventTools.AddIntPersistentListener(
+                    selectButton.onClick, new UnityAction<int>(panel.SelectRow), i);
+
+                rowY -= 70f;
+            }
+
+            panel.rowTexts = rows;
+
+            var prevButton = CreatePanelButton(panelGo.transform, "PrevPage", "이전",
+                new Vector2(-330f, -290f), new Vector2(150f, 56f), new Color(0.4f, 0.45f, 0.55f));
+            UnityEventTools.AddVoidPersistentListener(
+                prevButton.onClick, new UnityAction(panel.PreviousPage));
+
+            var nextButton = CreatePanelButton(panelGo.transform, "NextPage", "다음",
+                new Vector2(-165f, -290f), new Vector2(150f, 56f), new Color(0.4f, 0.45f, 0.55f));
+            UnityEventTools.AddVoidPersistentListener(
+                nextButton.onClick, new UnityAction(panel.NextPage));
+
+            var backButton = CreatePanelButton(panelGo.transform, "Back", "뒤로",
+                new Vector2(165f, -290f), new Vector2(150f, 56f), new Color(0.5f, 0.45f, 0.35f));
+            UnityEventTools.AddVoidPersistentListener(
+                backButton.onClick, new UnityAction(panel.GoBack));
 
             var closeButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
                 new Vector2(330f, -290f), new Vector2(150f, 56f), new Color(0.4f, 0.4f, 0.46f));

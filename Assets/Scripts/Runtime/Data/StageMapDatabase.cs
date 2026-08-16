@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace FarmCreature.Data
 {
-    /// <summary>전투터가 보여줄 맵 목록. <c>BattleEncounterDatabase</c> 를 대체한다.</summary>
+    /// <summary>전투터가 보여줄 맵 목록.</summary>
     [CreateAssetMenu(fileName = "StageMapDatabase", menuName = "FarmCreature/Stage Map Database")]
     public class StageMapDatabase : ScriptableObject
     {

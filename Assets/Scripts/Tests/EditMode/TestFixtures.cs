@@ -132,13 +132,6 @@ namespace FarmCreature.Tests
             return so;
         }
 
-        public static BattleEncounterDatabase MakeEncounterDatabase(params BattleEncounter[] entries)
-        {
-            var so = ScriptableObject.CreateInstance<BattleEncounterDatabase>();
-            so.encounters = new List<BattleEncounter>(entries);
-            return so;
-        }
-
         /// <summary>스테이지 픽스처. 해금 조건을 직접 넘긴다 (null 이면 항상 열림).</summary>
         public static BattleEncounter MakeStage(
             string stageId, string displayName, List<StageUnlock> unlock,
