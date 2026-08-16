@@ -472,8 +472,15 @@ namespace FarmCreature.Tests
                 "밀어내기가 안 걸렸다 — dt 곱을 빠뜨려도 이 테스트가 못 잡는다");
         }
 
+        /// <summary>
+        /// 완전히 겹친 좌표에는 <b>밀 방향도 갈 방향도 없다.</b> 지어내면 그 선택이 곧 숨은 난수가
+        /// 되어 "같은 입력 → 같은 결과"가 깨진다 (설계 4절).
+        ///
+        /// <b>전원을 한 점에 둔다</b> — 아군끼리도, 적과도 거리가 0 이다. 그래야 한 유닛이 먼저
+        /// 움직여 다른 유닛의 계산을 바꾸는 일(순차 갱신)이 끼어들지 않고 이 성질만 남는다.
+        /// </summary>
         [Test]
-        public void ExactlyOverlappingUnits_AreNotPushed()
+        public void FullyOverlappingUnits_StayPutAndProduceNoNaN()
         {
             var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
                 attackInterval: Never, cooldownSeconds: Never);
@@ -482,13 +489,21 @@ namespace FarmCreature.Tests
 
             var battle = new BattleSimulator(
                 Party(hero, hero), new[] { dummy },
-                Clustered(2),                                   // 아군 둘이 정확히 같은 좌표
-                new List<Vector2> { new Vector2(9f, 0f) });
+                Clustered(2), Clustered(1));      // 셋 다 원점
 
-            battle.Tick(0.5f);
+            for (int i = 0; i < 10; i++)
+            {
+                battle.Tick(0.5f);
+            }
 
-            Assert.AreEqual(battle.Allies[0].Position, battle.Allies[1].Position,
-                "겹친 좌표는 방향이 없다 — 지어내면 숨은 난수가 된다");
+            for (int i = 0; i < battle.Allies.Count; i++)
+            {
+                Assert.AreEqual(Vector2.zero, battle.Allies[i].Position,
+                    "겹친 좌표에서 방향을 지어내 움직였다 — 숨은 난수가 된다");
+                Assert.IsFalse(float.IsNaN(battle.Allies[i].Position.x)
+                               || float.IsNaN(battle.Allies[i].Position.y),
+                    "0 벡터를 정규화해 NaN 이 나왔다");
+            }
         }
 
         /// <summary>
@@ -596,6 +611,54 @@ namespace FarmCreature.Tests
         {
             Assert.Less(BattleSimulator.DefaultMinSpacing, BattleUnit.DefaultAttackRange,
                 "분리 간격이 사거리보다 넓으면 유닛이 붙기 전에 밀려나 영원히 못 때린다");
+        }
+
+        /// <summary>
+        /// 플레이스홀더 유닛의 지름. <c>Circle.png</c>(64×64, PPU 64) 를 <c>placeholderScale</c> 1 로
+        /// 그리므로 정확히 1 월드 유닛이다 (2026-08-16 Play 에서 실측 확인).
+        /// </summary>
+        private const float UnitDiameter = 1.0f;
+
+        /// <summary>
+        /// 실제로 벌어지는 간격은 <b>유닛 지름보다 넓고 사거리보다 좁은</b> 띠에 있어야 한다.
+        /// 좁으면 눈에 겹쳐 보이고(2026-08-16 에 실제로 그랬다), 넓으면 붙기 전에 밀려나
+        /// 전투가 멎는다 (HANDOFF 3.12 · 4.8).
+        ///
+        /// 사거리나 유닛 크기를 바꾸면 이 띠가 사라질 수 있다 — 그때 여기서 걸린다.
+        /// </summary>
+        [Test]
+        public void SettledSpacing_ExceedsUnitDiameterButFitsInRange()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 1, defense: 0, health: 100000,
+                attackInterval: Never, cooldownSeconds: Never);
+            var foe = TestFixtures.MakeEnemy("foe", maxHp: 100000, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { foe, foe, foe },
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2>
+                {
+                    new Vector2(4f, 0f), new Vector2(4.1f, 0.1f), new Vector2(4.2f, -0.1f)
+                });
+
+            for (int i = 0; i < 400; i++)
+            {
+                battle.Tick(0.1f);
+            }
+
+            for (int i = 0; i < battle.Enemies.Count; i++)
+            {
+                for (int j = i + 1; j < battle.Enemies.Count; j++)
+                {
+                    float gap = Vector2.Distance(
+                        battle.Enemies[i].Position, battle.Enemies[j].Position);
+
+                    Assert.GreaterOrEqual(gap, UnitDiameter,
+                        "적 " + i + " 와 " + j + " 가 눈에 겹친다 (간격 " + gap.ToString("F2")
+                        + ", 유닛 지름 " + UnitDiameter + ") — 벌리는 간격이 유닛보다 좁다");
+                }
+            }
         }
 
         /// <summary>

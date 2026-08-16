@@ -29,10 +29,14 @@ namespace FarmCreature.Core
 
         /// <summary>
         /// 유닛끼리 이 거리보다 가까우면 밀어낸다 (설계 4절).
-        /// <b><see cref="BattleUnit.DefaultAttackRange"/> 보다 작아야 한다</b> —
-        /// 크면 사거리 안에 들기 전에 서로 밀어내 영원히 못 때린다.
+        ///
+        /// <b><see cref="MaxSpacingToRangeRatio"/> 에서 유도한다</b> — 기본값을 따로 적어 두면
+        /// 상한(그 비율)과 어긋나고, 클램프는 값을 <b>낮추기만</b> 하므로 낮게 적힌 기본값은
+        /// 상한에 걸리지 않고 그대로 쓰인다. 실제로 0.9 로 적어 뒀다가
+        /// 유닛 지름(1.0)보다 좁아 계속 겹쳐 보였다 (2026-08-16 Play 확인).
         /// </summary>
-        public const float DefaultMinSpacing = 0.9f;
+        public const float DefaultMinSpacing =
+            BattleUnit.DefaultAttackRange * MaxSpacingToRangeRatio;
 
         /// <summary>
         /// 밀어내기 간격이 사거리의 이 비율을 넘지 못하게 자른다.
@@ -41,8 +45,15 @@ namespace FarmCreature.Core
         /// 맵 데이터(<c>BattleMapData.minSpacing</c>)는 <b>스폰 간격</b>을 위한 값이라
         /// 사거리와 무관하게 정해진다 — 실제로 <c>FieldMap</c> 은 1.4 이고 사거리는 1.2 다.
         /// 데이터 규율에 기대면 조용히 전투가 멎으므로 규칙 쪽에서 잘라낸다.
+        ///
+        /// <b>값이 좁은 띠에 갇혀 있다.</b> 결과 간격(사거리 × 이 비율)은
+        /// <b>유닛 지름(1.0)보다 넓고 사거리(1.2)보다 좁아야</b> 한다 —
+        /// 좁으면 유닛이 눈에 겹쳐 보이고, 넓으면 붙기 전에 밀려나 전투가 멎는다.
+        /// 0.9 → 1.2 × 0.9 = <b>1.08</b> 로 둘 다 만족한다.
+        /// 처음에 0.75(=0.90)로 뒀다가 **지름보다 좁아 유닛이 계속 닿아 보였다**
+        /// (2026-08-16 Play 확인).
         /// </summary>
-        private const float MaxSpacingToRangeRatio = 0.75f;
+        private const float MaxSpacingToRangeRatio = 0.9f;
 
         private readonly List<BattleUnit> allies = new List<BattleUnit>();
         private readonly List<BattleUnit> enemies = new List<BattleUnit>();

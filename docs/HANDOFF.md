@@ -19,7 +19,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **204/204 통과** (2026-08-16, 187 + 위치 기반 전투 17) |
+| EditMode 테스트 | **205/205 통과** (2026-08-16, 187 + 위치 기반 전투 18) |
 | PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절). **스폰이 랜덤이라 세 번 연속 통과로 확인했다** |
 | 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
 | 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동이 전부 패널을 연다**, 패널 6종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel), 건물 x 좌표가 맵 안 |
@@ -372,6 +372,19 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 몰리는 실제 상황을 재현해 **간격이 0.8 을 넘는지**와 **아무도 사거리 밖으로 안 밀려났는지**를
 함께 단언한다. 고치기 전에는 0.44 로 실패했다.
 
+**한 번 더 물렸다: 벌리는 간격이 유닛보다 좁았다.** 위를 고치고 다시 Play 해 보니
+간격은 0.75 로 늘었는데 **유닛 지름이 1.0** 이라 여전히 닿아 보였다.
+간격은 **유닛 지름(1.0)보다 넓고 사거리(1.2)보다 좁은** 띠에 있어야 한다 —
+좁으면 겹쳐 보이고 넓으면 붙기 전에 밀려나 전투가 멎는다(3.12).
+`MaxSpacingToRangeRatio` 를 0.9 로 올려 **1.08** 이 되게 했다.
+
+> **`DefaultMinSpacing` 은 그 비율에서 유도한다.** 기본값을 따로 적어 두면 상한과 어긋나고,
+> **클램프는 값을 낮추기만 하므로 낮게 적힌 기본값은 상한에 걸리지 않고 그대로 쓰인다.**
+> 실제로 0.9 로 적어 둔 채 비율만 올렸다가 아무것도 안 바뀌는 것을 겪었다.
+
+`SettledSpacing_ExceedsUnitDiameterButFitsInRange` 가 이 띠를 고정한다.
+**사거리나 유닛 크기를 바꾸면 띠가 사라질 수 있고, 그때 이 테스트가 걸린다.**
+
 **아직 남은 것 둘** (같은 자리에서 관찰됨)
 - **이름표가 겹쳐 읽을 수 없다.** `TextMesh` 라 자동 회피가 없다
 - **전장의 일부만 쓴다.** 전장은 x[−7..7]·y[−3.25..2.25] 인데 전투가 한 구석에서 끝난다.
@@ -389,7 +402,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (204개, 2026-08-16)
+### 5.1 테스트 (205개, 2026-08-16)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -401,7 +414,7 @@ Unity.exe -batchmode -runTests \
 
 | 픽스처 | 개수 |  | 픽스처 | 개수 |
 |---|---|---|---|---|
-| `BattleSimulatorTests` | 30 | | `PanelLabelsTests` | 30 |
+| `BattleSimulatorTests` | 31 | | `PanelLabelsTests` | 30 |
 | `CareActionsTests` | 18 | | `SaveSerializerTests` | 18 |
 | `GameDataIntegrationTests` | 16 | | `EvolutionEvaluatorTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
@@ -410,9 +423,9 @@ Unity.exe -batchmode -runTests \
 | `HatchServiceTests` | 7 | | `ShopDataTests` | 6 |
 | `ShopServiceTests` | 6 | | `DataLayerTests` | 5 |
 | `FarmLayoutTests` | 5 | | `PipelineSmokeTests` | 2 |
-| | | | **합계** | **204** |
+| | | | **합계** | **205** |
 
-> `BattleSimulatorTests` 가 8/16 위치 기반 전투 작업에서 **13 → 30** 로 늘었다.
+> `BattleSimulatorTests` 가 8/16 위치 기반 전투 작업에서 **13 → 31** 로 늘었다.
 > **기존 13개는 단언이 하나도 안 바뀌었다** — 좌표만 `Clustered(n)` 으로 넘긴다 (2.5절).
 >
 > 같은 날 부화소 작업에서 `HatchServiceTests`(7) 가 생기고
@@ -533,7 +546,7 @@ Assets/
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
                      BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  19개 파일(픽스처 18 + TestFixtures 헬퍼), 테스트 204개
+    Tests/EditMode/  19개 파일(픽스처 18 + TestFixtures 헬퍼), 테스트 205개
     Tests/PlayMode/  BattleSceneSmokeTests — 씬을 실제로 로드해 돌린다, 테스트 7개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
