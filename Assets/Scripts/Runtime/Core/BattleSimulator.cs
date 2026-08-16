@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FarmCreature.Data;
+using UnityEngine;
 
 namespace FarmCreature.Core
 {
@@ -26,9 +27,29 @@ namespace FarmCreature.Core
         /// <summary>한 틱에 같은 유닛이 무한히 행동하지 않게 막는 상한 (긴 dt 방어).</summary>
         private const int MaxActionsPerTickPerUnit = 8;
 
+        /// <summary>
+        /// 유닛끼리 이 거리보다 가까우면 밀어낸다 (설계 4절).
+        /// <b><see cref="BattleUnit.DefaultAttackRange"/> 보다 작아야 한다</b> —
+        /// 크면 사거리 안에 들기 전에 서로 밀어내 영원히 못 때린다.
+        /// </summary>
+        public const float DefaultMinSpacing = 0.9f;
+
+        /// <summary>
+        /// 밀어내기 간격이 사거리의 이 비율을 넘지 못하게 자른다.
+        /// <b>넘으면 유닛이 사거리 안에 들기 전에 서로 밀어내 영원히 못 때린다.</b>
+        ///
+        /// 맵 데이터(<c>BattleMapData.minSpacing</c>)는 <b>스폰 간격</b>을 위한 값이라
+        /// 사거리와 무관하게 정해진다 — 실제로 <c>FieldMap</c> 은 1.4 이고 사거리는 1.2 다.
+        /// 데이터 규율에 기대면 조용히 전투가 멎으므로 규칙 쪽에서 잘라낸다.
+        /// </summary>
+        private const float MaxSpacingToRangeRatio = 0.75f;
+
         private readonly List<BattleUnit> allies = new List<BattleUnit>();
         private readonly List<BattleUnit> enemies = new List<BattleUnit>();
         private readonly List<string> log = new List<string>();
+
+        /// <summary>겹침을 막는 최소 간격. 맵마다 다를 수 있어 생성자가 값으로 받는다.</summary>
+        private readonly float minSpacing;
 
         public IReadOnlyList<BattleUnit> Allies
         {
@@ -52,7 +73,18 @@ namespace FarmCreature.Core
 
         public float ElapsedSeconds { get; private set; }
 
-        public BattleSimulator(IList<CreatureInstance> party, IList<EnemyData> foes)
+        /// <summary>
+        /// <paramref name="allyPositions"/> · <paramref name="enemyPositions"/> 는 스폰 좌표다.
+        /// <b>시뮬레이터 안에서는 난수를 부르지 않는다</b> — 배치를 고르는 일은 호출부가 하고,
+        /// 여기서는 받은 좌표를 그대로 쓴다. 그래서 게임은 매번 다르고 테스트는 완전히
+        /// 결정적이다 (설계 3.1).
+        /// </summary>
+        public BattleSimulator(
+            IList<CreatureInstance> party,
+            IList<EnemyData> foes,
+            IList<Vector2> allyPositions,
+            IList<Vector2> enemyPositions,
+            float minSpacing = DefaultMinSpacing)
         {
             if (party != null)
             {
@@ -78,6 +110,13 @@ namespace FarmCreature.Core
                 }
             }
 
+            // 유닛이 다 만들어진 뒤에 정한다 — 사거리를 알아야 자를 수 있다.
+            this.minSpacing = ClampSpacing(minSpacing, allies, enemies);
+
+            // 좌표는 Resolve 보다 먼저 선다 — 규칙이 좌표를 읽기 때문이다.
+            Place(allies, allyPositions);
+            Place(enemies, enemyPositions);
+
             // 한쪽이 비어 있으면 시작하자마자 끝난다. 파티가 비었을 때가 이 경우다.
             Outcome = Resolve();
 
@@ -88,6 +127,53 @@ namespace FarmCreature.Core
             else if (allies.Count == 0)
             {
                 Append("내보낼 케어가 없다.");
+            }
+        }
+
+        /// <summary>
+        /// 요청된 간격을 <b>가장 짧은 사거리</b> 기준으로 자른다.
+        /// 자르지 않으면 밀어내기가 접근을 이겨 전투가 조용히 멎는다
+        /// (<see cref="MaxSpacingToRangeRatio"/> 참고).
+        /// </summary>
+        private static float ClampSpacing(float requested, List<BattleUnit> a, List<BattleUnit> b)
+        {
+            float smallestRange = float.MaxValue;
+            smallestRange = SmallestRange(a, smallestRange);
+            smallestRange = SmallestRange(b, smallestRange);
+
+            if (smallestRange == float.MaxValue)
+            {
+                return requested;   // 유닛이 없다. 자를 기준도 없다.
+            }
+
+            float ceiling = smallestRange * MaxSpacingToRangeRatio;
+            return requested < ceiling ? requested : ceiling;
+        }
+
+        private static float SmallestRange(List<BattleUnit> units, float current)
+        {
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (units[i].AttackRange < current)
+                {
+                    current = units[i].AttackRange;
+                }
+            }
+
+            return current;
+        }
+
+        /// <summary>
+        /// 좌표가 유닛 수보다 적으면 남는 유닛은 원점에 선다. 짧은 목록은 호출부의 실수지만
+        /// 예외로 죽이지 않는다 — 전투가 안 열리는 것보다 겹쳐 서는 편이 낫다 (설계 3.1).
+        /// </summary>
+        private static void Place(List<BattleUnit> units, IList<Vector2> positions)
+        {
+            for (int i = 0; i < units.Count; i++)
+            {
+                units[i].Position = positions != null && i < positions.Count
+                    ? positions[i]
+                    : Vector2.zero;
             }
         }
 
@@ -127,12 +213,25 @@ namespace FarmCreature.Core
                     continue;
                 }
 
+                var target = NearestAlive(opponents, unit.Position);
+                if (target == null)
+                {
+                    continue;
+                }
+
+                // 타이머는 사거리 밖에서도 찬다 — 붙는 순간 바로 나가야 접근 시간이 공백으로
+                // 느껴지지 않는다 (설계 3.2).
                 if (unit.Skill != null && unit.Skill.cooldownSeconds > 0f)
                 {
                     unit.SkillTimer += deltaTime;
 
+                    // 회복은 거리를 무시한다. 공격 스킬만 사거리를 지킨다 (설계 3.4).
+                    // 그래서 이 블록이 사거리 검사보다 앞에 있다.
+                    bool skillReaches = unit.Skill.effect == SkillEffect.Heal || InRange(unit, target);
+
                     int used = 0;
-                    while (unit.SkillTimer >= unit.Skill.cooldownSeconds
+                    while (skillReaches
+                           && unit.SkillTimer >= unit.Skill.cooldownSeconds
                            && used < MaxActionsPerTickPerUnit
                            && unit.IsAlive
                            && AnyAlive(opponents))
@@ -145,6 +244,12 @@ namespace FarmCreature.Core
 
                 unit.AttackTimer += deltaTime;
 
+                if (!InRange(unit, target))
+                {
+                    MoveToward(unit, target, side, opponents, deltaTime);
+                    continue;
+                }
+
                 int swings = 0;
                 while (unit.AttackTimer >= unit.AttackInterval
                        && swings < MaxActionsPerTickPerUnit
@@ -152,15 +257,120 @@ namespace FarmCreature.Core
                        && AnyAlive(opponents))
                 {
                     unit.AttackTimer -= unit.AttackInterval;
-                    BasicAttack(unit, opponents);
+                    BasicAttack(unit, target, opponents);
                     swings++;
                 }
             }
         }
 
-        private void BasicAttack(BattleUnit attacker, List<BattleUnit> opponents)
+        /// <summary>
+        /// <paramref name="from"/> 에서 가장 가까운 생존자. <b>거리가 같으면 목록에서 앞선 쪽</b>이다 —
+        /// 동률에 순서를 못 박아야 결과가 재현된다 (설계 3.3).
+        /// </summary>
+        private static BattleUnit NearestAlive(List<BattleUnit> units, Vector2 from)
         {
-            var target = FirstAlive(opponents);
+            BattleUnit best = null;
+            float bestSqr = float.MaxValue;
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (!units[i].IsAlive)
+                {
+                    continue;
+                }
+
+                float sqr = (units[i].Position - from).sqrMagnitude;
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    best = units[i];
+                }
+            }
+
+            return best;
+        }
+
+        private static bool InRange(BattleUnit unit, BattleUnit target)
+        {
+            return (target.Position - unit.Position).sqrMagnitude
+                   <= unit.AttackRange * unit.AttackRange;
+        }
+
+        /// <summary>
+        /// 타겟 쪽으로 <c>MoveSpeed × dt</c> 만큼 간다. <b>이동 중에는 때리지 않는다</b> (설계 1.3).
+        /// 겹침 밀어내기도 여기서 함께 더한다.
+        /// </summary>
+        private void MoveToward(
+            BattleUnit unit, BattleUnit target,
+            List<BattleUnit> side, List<BattleUnit> opponents, float deltaTime)
+        {
+            Vector2 toTarget = target.Position - unit.Position;
+
+            // 정확히 같은 좌표면 방향이 없다. 지어내면 그 선택이 곧 숨은 난수가 된다 (설계 4절).
+            if (toTarget.sqrMagnitude <= 0f)
+            {
+                return;
+            }
+
+            Vector2 velocity = toTarget.normalized * unit.MoveSpeed
+                               + Separation(unit, side, opponents);
+
+            // 밀어내기도 dt 로 스케일한다 — 안 하면 틱 길이에 따라 결과가 갈린다 (설계 4절).
+            unit.Position += velocity * deltaTime;
+        }
+
+        /// <summary>
+        /// <see cref="minSpacing"/> 안에 들어온 다른 살아있는 유닛들에게서 밀려나는 성분.
+        /// 아군·적을 가리지 않는다 — 겹쳐 보이는 것은 편을 안 가린다.
+        ///
+        /// <b>이동하는 유닛에만 적용된다</b> — 이미 멈춰 싸우는 유닛까지 밀면
+        /// 사거리 안팎을 오가며 떨린다 (설계 4절).
+        /// </summary>
+        private Vector2 Separation(BattleUnit unit, List<BattleUnit> side, List<BattleUnit> opponents)
+        {
+            if (minSpacing <= 0f)
+            {
+                return Vector2.zero;
+            }
+
+            return SeparationFrom(unit, side) + SeparationFrom(unit, opponents);
+        }
+
+        private Vector2 SeparationFrom(BattleUnit unit, List<BattleUnit> others)
+        {
+            Vector2 push = Vector2.zero;
+
+            for (int i = 0; i < others.Count; i++)
+            {
+                var other = others[i];
+                if (other == unit || !other.IsAlive)
+                {
+                    continue;
+                }
+
+                Vector2 away = unit.Position - other.Position;
+                float distance = away.magnitude;
+
+                // 정확히 겹치면 방향이 없다. 밀지 않는다 (설계 4절).
+                if (distance <= 0f || distance >= minSpacing)
+                {
+                    continue;
+                }
+
+                push += away.normalized * (minSpacing - distance);
+            }
+
+            return push;
+        }
+
+        private void BasicAttack(BattleUnit attacker, BattleUnit target, List<BattleUnit> opponents)
+        {
+            // 앞선 타격으로 타겟이 죽었으면 다시 고른다.
+            if (target == null || !target.IsAlive)
+            {
+                target = NearestAlive(opponents, attacker.Position);
+            }
+
             if (target == null)
             {
                 return;
@@ -191,7 +401,7 @@ namespace FarmCreature.Core
                 return;
             }
 
-            var target = FirstAlive(opponents);
+            var target = NearestAlive(opponents, user.Position);
             if (target == null)
             {
                 return;
@@ -270,19 +480,6 @@ namespace FarmCreature.Core
             }
 
             return false;
-        }
-
-        private static BattleUnit FirstAlive(List<BattleUnit> units)
-        {
-            for (int i = 0; i < units.Count; i++)
-            {
-                if (units[i].IsAlive)
-                {
-                    return units[i];
-                }
-            }
-
-            return null;
         }
 
         /// <summary>비율이 가장 낮은 생존자. 회복 스킬의 대상이다.</summary>

@@ -87,6 +87,26 @@ namespace FarmCreature.Presentation
                 return;
             }
 
+            // 유닛이 움직인다. 위치는 시뮬레이터가 정하고 여기서는 따라 그리기만 한다 (설계 1.1).
+            transform.position = BattleField.ToWorld(unit.Position);
+
+            if (body != null)
+            {
+                // 정렬 순서도 매 프레임 다시 계산한다 — 위아래로 움직이면 앞뒤 관계가 바뀐다.
+                body.sortingOrder = BattleField.SortingOrderFor(unit.Position.y);
+                ApplySortingOffset(healthBarBack, 1);
+                ApplySortingOffset(healthBarFill, 2);
+
+                if (nameLabel != null)
+                {
+                    var labelRenderer = nameLabel.GetComponent<MeshRenderer>();
+                    if (labelRenderer != null)
+                    {
+                        labelRenderer.sortingOrder = body.sortingOrder + 3;
+                    }
+                }
+            }
+
             float ratio = unit.MaxHp > 0 ? Mathf.Clamp01((float)unit.Hp / unit.MaxHp) : 0f;
 
             if (healthBarFill != null)

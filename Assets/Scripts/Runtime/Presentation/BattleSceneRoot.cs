@@ -86,13 +86,83 @@ namespace FarmCreature.Presentation
             var party = LivePartyOf(state);
             var foes = FoesOf(encounter);
 
-            battle = new BattleSimulator(party, foes);
-
             var map = encounter != null && encounter.map != null ? encounter.map : defaultMap;
+
+            // 좌표를 시뮬레이터보다 먼저 고른다 — 이제 배치가 규칙이다 (설계 1.1).
+            List<Vector2> allyPoints;
+            List<Vector2> enemyPoints;
+            PickSpawns(map, party.Count, foes.Count, out allyPoints, out enemyPoints);
+
+            battle = new BattleSimulator(
+                party, foes, allyPoints, enemyPoints,
+                map != null ? map.minSpacing : BattleSimulator.DefaultMinSpacing);
+
             ApplyMap(map);
-            PlaceUnits(map, party, foes);
+            PlaceUnits(party, foes, allyPoints, enemyPoints);
 
             RefreshTexts();
+        }
+
+        /// <summary>
+        /// 양측이 함께 서는 전장. <b>아군 구역과 적 구역을 감싸는 사각형</b>이다 —
+        /// 난전이라 구역을 나누지 않는다 (설계 5절).
+        ///
+        /// <see cref="BattleMapData"/> 는 seed-only 라 건드리지 않는다 (함정 3.11).
+        /// 맵 데이터 자체는 다음 프로젝트(맵/스테이지)에서 다시 짠다.
+        ///
+        /// PlayMode 스모크 테스트가 이 메서드를 그대로 불러 검사한다 — 식이 갈라지면
+        /// 검사가 실제 배치와 다른 것을 보게 된다.
+        /// </summary>
+        public static Rect BattlefieldOf(BattleMapData map)
+        {
+            if (map == null)
+            {
+                return new Rect();
+            }
+
+            return Rect.MinMaxRect(
+                Mathf.Min(map.AllySpawnArea.xMin, map.EnemySpawnArea.xMin),
+                Mathf.Min(map.AllySpawnArea.yMin, map.EnemySpawnArea.yMin),
+                Mathf.Max(map.AllySpawnArea.xMax, map.EnemySpawnArea.xMax),
+                Mathf.Max(map.AllySpawnArea.yMax, map.EnemySpawnArea.yMax));
+        }
+
+        /// <summary>
+        /// 스폰 좌표를 고른다. <b>여기서만 난수를 쓴다</b> — 시뮬레이터는 받은 좌표를 그대로 쓴다.
+        /// 매 전투 배치가 달라야 하고, 이제 그것이 결과까지 바꾼다 (설계 3.1).
+        /// </summary>
+        private static void PickSpawns(
+            BattleMapData map, int allyCount, int foeCount,
+            out List<Vector2> allyPoints, out List<Vector2> enemyPoints)
+        {
+            allyPoints = new List<Vector2>();
+            enemyPoints = new List<Vector2>();
+
+            if (map == null)
+            {
+                Debug.LogError("[FarmCreature] 맵이 없어 유닛을 세울 수 없다. defaultMap 배선을 확인할 것.");
+                return;
+            }
+
+            var battlefield = BattlefieldOf(map);
+            int seed = Random.Range(int.MinValue, int.MaxValue);
+
+            // 한 번에 함께 뽑는다. 나눠 뽑으면 아군과 적 사이의 간격이 보장되지 않아
+            // 아군 위에 적이 겹쳐 설 수 있다 (설계 5절).
+            var all = SpawnPointPicker.PickSpawnPoints(
+                battlefield, allyCount + foeCount, map.minSpacing, seed);
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (i < allyCount)
+                {
+                    allyPoints.Add(all[i]);
+                }
+                else
+                {
+                    enemyPoints.Add(all[i]);
+                }
+            }
         }
 
         // ---------- 준비 ----------
@@ -158,29 +228,17 @@ namespace FarmCreature.Presentation
         }
 
         /// <summary>
-        /// 양측을 각자의 영역 안 랜덤 좌표에 세운다. <b>좌표는 표시 전용이다</b> —
-        /// 스폰이 랜덤이어도 전투 결과는 결정적이다 (설계 1.1).
+        /// 슬롯을 켜고 유닛을 담는다. 좌표는 <see cref="StartBattle"/> 이 이미 골라
+        /// 시뮬레이터에도 같은 것을 넘겼다 — 여기서 다시 뽑으면 화면과 규칙이 어긋난다.
         /// </summary>
-        private void PlaceUnits(BattleMapData map, List<CreatureInstance> party, List<EnemyData> foes)
+        private void PlaceUnits(
+            List<CreatureInstance> party, List<EnemyData> foes,
+            List<Vector2> allyPoints, List<Vector2> enemyPoints)
         {
             shownAllies.Clear();
             shownEnemies.Clear();
 
-            if (map == null)
-            {
-                Debug.LogError("[FarmCreature] 맵이 없어 유닛을 세울 수 없다. defaultMap 배선을 확인할 것.");
-                return;
-            }
-
-            // 게임에서는 매번 다른 배치가 나와야 한다. seed 를 인자로 받는 것은 테스트를 위한 것이다.
-            int seed = Random.Range(int.MinValue, int.MaxValue);
-
-            var allyPoints = SpawnPointPicker.PickSpawnPoints(
-                map.AllySpawnArea, party.Count, map.minSpacing, seed);
-            var enemyPoints = SpawnPointPicker.PickSpawnPoints(
-                map.EnemySpawnArea, foes.Count, map.minSpacing, seed + 1);
-
-            for (int i = 0; i < party.Count && i < allySlots.Count; i++)
+            for (int i = 0; i < party.Count && i < allySlots.Count && i < allyPoints.Count; i++)
             {
                 var species = party[i].CurrentSpecies;
                 var view = allySlots[i];
@@ -198,7 +256,7 @@ namespace FarmCreature.Presentation
                 shownAllies.Add(view);
             }
 
-            for (int i = 0; i < foes.Count && i < enemySlots.Count; i++)
+            for (int i = 0; i < foes.Count && i < enemySlots.Count && i < enemyPoints.Count; i++)
             {
                 var view = enemySlots[i];
                 if (view == null)

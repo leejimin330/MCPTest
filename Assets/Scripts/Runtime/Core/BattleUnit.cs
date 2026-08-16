@@ -1,4 +1,5 @@
 using FarmCreature.Data;
+using UnityEngine;
 
 namespace FarmCreature.Core
 {
@@ -9,6 +10,16 @@ namespace FarmCreature.Core
     /// </summary>
     public class BattleUnit
     {
+        /// <summary>전 유닛 공통 이동속도(월드 유닛/초). 종별 차등은 두지 않는다 (설계 1.5).</summary>
+        public const float DefaultMoveSpeed = 2.0f;
+
+        /// <summary>
+        /// 전 유닛 공통 사거리(월드 유닛).
+        /// <b><see cref="BattleSimulator.DefaultMinSpacing"/> 보다 커야 한다</b> —
+        /// 작으면 유닛이 사거리 안에 들기 전에 서로 밀어내 영원히 못 때린다 (설계 2절).
+        /// </summary>
+        public const float DefaultAttackRange = 1.2f;
+
         public string Name;
         public int MaxHp;
         public int Hp;
@@ -25,6 +36,18 @@ namespace FarmCreature.Core
 
         /// <summary>쓰러뜨렸을 때 주는 재화. 아군은 0.</summary>
         public int GoldReward;
+
+        /// <summary>초당 이동 거리(월드 유닛). 지금은 전 유닛이 같다 (설계 1.5).</summary>
+        public float MoveSpeed = DefaultMoveSpeed;
+
+        /// <summary>이 거리 안에 들어야 때린다(월드 유닛).</summary>
+        public float AttackRange = DefaultAttackRange;
+
+        /// <summary>
+        /// 전장 좌표. <b>전투 중에만 존재한다.</b> 생성자가 아니라
+        /// <see cref="BattleSimulator"/> 가 스폰 시점에 배치한다.
+        /// </summary>
+        public Vector2 Position;
 
         /// <summary>전투 중에만 쓰이는 타이머. 시뮬레이터가 관리한다.</summary>
         internal float AttackTimer;

@@ -67,15 +67,17 @@ namespace FarmCreature.Tests
         }
 
         [UnityTest]
-        public IEnumerator BattleScene_PlacesUnitsInsideTheirSpawnAreas()
+        public IEnumerator BattleScene_PlacesUnitsInsideTheBattlefield()
         {
             yield return LoadScene(BattleSceneName);
 
             var root = FindRoot();
-            var map = root.defaultMap;
 
-            AssertAllInside(root.allySlots, map.AllySpawnArea, "아군");
-            AssertAllInside(root.enemySlots, map.EnemySpawnArea, "적");
+            // 난전이라 아군·적이 한 전장을 함께 쓴다 (설계 5절). 구역별로 나눠 보지 않는다.
+            var battlefield = BattleSceneRoot.BattlefieldOf(root.defaultMap);
+
+            AssertAllInside(root.allySlots, battlefield, "아군");
+            AssertAllInside(root.enemySlots, battlefield, "적");
         }
 
         [UnityTest]
@@ -84,14 +86,40 @@ namespace FarmCreature.Tests
             yield return LoadScene(BattleSceneName);
 
             var root = FindRoot();
-            var target = FirstActive(root.enemySlots);
-            float fullWidth = target.healthBarFill.transform.localScale.x;
+
+            // 특정 슬롯을 지목하지 않는다. 타겟은 '가장 가까운 적'이라
+            // 누가 먼저 맞을지 배치에 따라 달라진다 (설계 3.3) — 슬롯 0 을 보면 배치 운에 따라
+            // 멀쩡한 게임에서도 실패한다. 여기서 볼 것은 '전투가 도는가'이지 '누가 맞는가'가 아니다.
+            var watched = new System.Collections.Generic.List<BattleUnitView>();
+            watched.AddRange(ActiveOnly(root.allySlots));
+            watched.AddRange(ActiveOnly(root.enemySlots));
+
+            Assert.IsNotEmpty(watched, "양쪽에 유닛이 하나도 서지 않았다");
+
+            var fullWidths = new System.Collections.Generic.List<float>();
+            for (int i = 0; i < watched.Count; i++)
+            {
+                fullWidths.Add(watched[i].healthBarFill.transform.localScale.x);
+            }
+
+            System.Func<bool> anyShrank = () =>
+            {
+                for (int i = 0; i < watched.Count; i++)
+                {
+                    if (watched[i].healthBarFill.transform.localScale.x < fullWidths[i])
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            };
 
             // 체력바가 줄어들면 시뮬레이터가 실제로 돌고 뷰가 그것을 읽고 있다는 뜻이다.
-            yield return RunUntil(() => target.healthBarFill.transform.localScale.x < fullWidth);
+            yield return RunUntil(anyShrank);
 
-            Assert.Less(target.healthBarFill.transform.localScale.x, fullWidth,
-                "체력바가 " + TimeoutSeconds + "초 동안 한 번도 줄지 않았다 — "
+            Assert.IsTrue(anyShrank(),
+                "어느 체력바도 " + TimeoutSeconds + "초 동안 줄지 않았다 — "
                 + "전투가 돌지 않거나 뷰가 갱신되지 않는다");
         }
 
@@ -256,6 +284,22 @@ namespace FarmCreature.Tests
             return count;
         }
 
+        /// <summary>켜진 슬롯만 추린다. 꺼진 슬롯은 이번 전투에 안 나온 여분이다.</summary>
+        private static System.Collections.Generic.List<BattleUnitView> ActiveOnly(
+            System.Collections.Generic.List<BattleUnitView> slots)
+        {
+            var active = new System.Collections.Generic.List<BattleUnitView>();
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (slots[i] != null && slots[i].gameObject.activeSelf)
+                {
+                    active.Add(slots[i]);
+                }
+            }
+
+            return active;
+        }
+
         private static BattleUnitView FirstActive(System.Collections.Generic.List<BattleUnitView> slots)
         {
             for (int i = 0; i < slots.Count; i++)
@@ -270,6 +314,15 @@ namespace FarmCreature.Tests
             return null;
         }
 
+        /// <summary>
+        /// 유닛이 <b>움직이므로</b> "영역 안"은 스폰 시점에만 정확하다. 이 검사는 씬을 로드하고
+        /// 몇 프레임 뒤에 도는데 <c>Time.timeScale</c> 이 10 이라 그동안 꽤 간다.
+        /// 그래서 이동 여유를 두고 본다 — 잡으려는 것은 "몇 유닛 흘렀나"가 아니라
+        /// <b>스폰이 통째로 어긋났나</b>(원점에 몰림, 맵 밖, 배치 안 됨)이고, 그건 전장 크기만큼
+        /// 벗어나므로 이 여유로도 그대로 걸린다.
+        /// </summary>
+        private const float MovementAllowance = 2f;
+
         private static void AssertAllInside(
             System.Collections.Generic.List<BattleUnitView> slots, Rect area, string label)
         {
@@ -282,10 +335,10 @@ namespace FarmCreature.Tests
 
                 var position = slots[i].transform.position;
 
-                Assert.GreaterOrEqual(position.x, area.xMin - 0.001f, label + " " + i + " 가 스폰 영역 왼쪽 밖에 섰다");
-                Assert.LessOrEqual(position.x, area.xMax + 0.001f, label + " " + i + " 가 스폰 영역 오른쪽 밖에 섰다");
-                Assert.GreaterOrEqual(position.y, area.yMin - 0.001f, label + " " + i + " 가 스폰 영역 아래 밖에 섰다");
-                Assert.LessOrEqual(position.y, area.yMax + 0.001f, label + " " + i + " 가 스폰 영역 위 밖에 섰다");
+                Assert.GreaterOrEqual(position.x, area.xMin - MovementAllowance, label + " " + i + " 가 전장 왼쪽 밖에 섰다");
+                Assert.LessOrEqual(position.x, area.xMax + MovementAllowance, label + " " + i + " 가 전장 오른쪽 밖에 섰다");
+                Assert.GreaterOrEqual(position.y, area.yMin - MovementAllowance, label + " " + i + " 가 전장 아래 밖에 섰다");
+                Assert.LessOrEqual(position.y, area.yMax + MovementAllowance, label + " " + i + " 가 전장 위 밖에 섰다");
             }
         }
     }
