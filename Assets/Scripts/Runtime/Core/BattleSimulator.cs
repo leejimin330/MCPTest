@@ -186,6 +186,7 @@ namespace FarmCreature.Core
 
                 if (!InRange(unit, target))
                 {
+                    MoveToward(unit, target, deltaTime);
                     continue;
                 }
 
@@ -247,6 +248,22 @@ namespace FarmCreature.Core
         {
             return (target.Position - unit.Position).sqrMagnitude
                    <= unit.AttackRange * unit.AttackRange;
+        }
+
+        /// <summary>
+        /// 타겟 쪽으로 <c>MoveSpeed × dt</c> 만큼 간다. <b>이동 중에는 때리지 않는다</b> (설계 1.3).
+        /// </summary>
+        private void MoveToward(BattleUnit unit, BattleUnit target, float deltaTime)
+        {
+            Vector2 toTarget = target.Position - unit.Position;
+
+            // 정확히 같은 좌표면 방향이 없다. 지어내면 그 선택이 곧 숨은 난수가 된다 (설계 4절).
+            if (toTarget.sqrMagnitude <= 0f)
+            {
+                return;
+            }
+
+            unit.Position += toTarget.normalized * unit.MoveSpeed * deltaTime;
         }
 
         private void BasicAttack(BattleUnit attacker, BattleUnit target, List<BattleUnit> opponents)

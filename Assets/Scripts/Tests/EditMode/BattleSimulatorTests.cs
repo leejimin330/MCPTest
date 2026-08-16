@@ -372,5 +372,57 @@ namespace FarmCreature.Tests
             Assert.Less(battle.Enemies[0].Hp, 50, "동률은 목록에서 앞선 쪽이 맞아야 한다");
             Assert.AreEqual(50, battle.Enemies[1].Hp);
         }
+
+        // ---------- 이동 ----------
+
+        [Test]
+        public void WalksIntoRange_ThenFights()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: 0.5f, cooldownSeconds: Never);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { dummy },
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2> { new Vector2(6f, 0f) });
+
+            // 6 유닛 거리, 속도 2/초 → 사거리(1.2)까지 약 2.4초. 넉넉히 굴린다.
+            for (int i = 0; i < 40; i++)
+            {
+                battle.Tick(0.1f);
+            }
+
+            float distance = (battle.Enemies[0].Position - battle.Allies[0].Position).magnitude;
+            Assert.LessOrEqual(distance, battle.Allies[0].AttackRange + 0.01f, "붙지 못했다");
+            Assert.Less(battle.Enemies[0].Hp, 500, "붙었는데 때리지 않았다");
+        }
+
+        [Test]
+        public void Retargets_WhenACloserEnemyArrives()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: 0.5f, cooldownSeconds: Never);
+            var far = TestFixtures.MakeEnemy("far", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+            var rusher = TestFixtures.MakeEnemy("rusher", maxHp: 500, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { far, rusher },
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2> { new Vector2(3f, 0f), new Vector2(-8f, 0f) });
+
+            // 처음엔 far(3) 가 가깝다. rusher 는 −8 에서 다가온다.
+            // 충분히 굴리면 rusher 가 더 가까워지는 시점이 온다.
+            for (int i = 0; i < 100; i++)
+            {
+                battle.Tick(0.1f);
+            }
+
+            Assert.Less(battle.Enemies[1].Hp, 500,
+                "달려든 적이 한 대도 안 맞았다 — 타겟을 다시 안 골랐다");
+        }
     }
 }
