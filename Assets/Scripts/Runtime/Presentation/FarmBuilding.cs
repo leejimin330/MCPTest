@@ -104,7 +104,7 @@ namespace FarmCreature.Presentation
                 case BuildingKind.Barn:
                     return "몬스터를 넣고 꺼내는 곳. (기능 준비 중)";
                 case BuildingKind.Hatchery:
-                    return "알을 부화시키는 곳. (알 시스템 준비 중)";
+                    return "알을 부화시키는 곳.";
                 case BuildingKind.Storage:
                     return "몬스터에게 아이템을 장착시키는 곳. (기능 준비 중)";
                 case BuildingKind.Shop:
