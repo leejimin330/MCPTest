@@ -111,20 +111,41 @@ namespace FarmCreature.Presentation
             BattleMapData map, int allyCount, int foeCount,
             out List<Vector2> allyPoints, out List<Vector2> enemyPoints)
         {
+            allyPoints = new List<Vector2>();
+            enemyPoints = new List<Vector2>();
+
             if (map == null)
             {
                 Debug.LogError("[FarmCreature] 맵이 없어 유닛을 세울 수 없다. defaultMap 배선을 확인할 것.");
-                allyPoints = new List<Vector2>();
-                enemyPoints = new List<Vector2>();
                 return;
             }
 
+            // 두 구역을 감싸는 사각형이 전장이다. 양측을 여기에 섞어 뿌린다 (설계 5절).
+            // BattleMapData 는 seed-only 라 건드리지 않는다 — 맵 데이터는 다음 프로젝트에서 다시 짠다.
+            var battlefield = Rect.MinMaxRect(
+                Mathf.Min(map.AllySpawnArea.xMin, map.EnemySpawnArea.xMin),
+                Mathf.Min(map.AllySpawnArea.yMin, map.EnemySpawnArea.yMin),
+                Mathf.Max(map.AllySpawnArea.xMax, map.EnemySpawnArea.xMax),
+                Mathf.Max(map.AllySpawnArea.yMax, map.EnemySpawnArea.yMax));
+
             int seed = Random.Range(int.MinValue, int.MaxValue);
 
-            allyPoints = SpawnPointPicker.PickSpawnPoints(
-                map.AllySpawnArea, allyCount, map.minSpacing, seed);
-            enemyPoints = SpawnPointPicker.PickSpawnPoints(
-                map.EnemySpawnArea, foeCount, map.minSpacing, seed + 1);
+            // 한 번에 함께 뽑는다. 나눠 뽑으면 아군과 적 사이의 간격이 보장되지 않아
+            // 아군 위에 적이 겹쳐 설 수 있다 (설계 5절).
+            var all = SpawnPointPicker.PickSpawnPoints(
+                battlefield, allyCount + foeCount, map.minSpacing, seed);
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (i < allyCount)
+                {
+                    allyPoints.Add(all[i]);
+                }
+                else
+                {
+                    enemyPoints.Add(all[i]);
+                }
+            }
         }
 
         // ---------- 준비 ----------
