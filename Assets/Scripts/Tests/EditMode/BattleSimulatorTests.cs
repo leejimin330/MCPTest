@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using FarmCreature.Core;
 using FarmCreature.Data;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace FarmCreature.Tests
 {
@@ -251,6 +252,30 @@ namespace FarmCreature.Tests
             }
 
             return ticks;
+        }
+
+        // ---------- 위치·이동속도·사거리 ----------
+
+        [Test]
+        public void FromCreature_GivesDefaultMovementValues()
+        {
+            var species = TestFixtures.MakeSpecies("sprigling", "스프리글링", 5, 4, 20);
+            var unit = BattleUnit.FromCreature(CreatureInstance.CreateNew(species));
+
+            Assert.AreEqual(BattleUnit.DefaultMoveSpeed, unit.MoveSpeed, 0.001f);
+            Assert.AreEqual(BattleUnit.DefaultAttackRange, unit.AttackRange, 0.001f);
+            Assert.AreEqual(Vector2.zero, unit.Position, "위치는 시뮬레이터가 배치한다");
+        }
+
+        [Test]
+        public void FromEnemy_GivesDefaultMovementValues()
+        {
+            var enemy = TestFixtures.MakeEnemy("rat", maxHp: 8, attack: 3, defense: 1,
+                attackInterval: 1.6f, goldReward: 4);
+            var unit = BattleUnit.FromEnemy(enemy);
+
+            Assert.AreEqual(BattleUnit.DefaultMoveSpeed, unit.MoveSpeed, 0.001f);
+            Assert.AreEqual(BattleUnit.DefaultAttackRange, unit.AttackRange, 0.001f);
         }
     }
 }
