@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FarmCreature.Data;
+using UnityEngine;
 
 namespace FarmCreature.Core
 {
@@ -26,9 +27,19 @@ namespace FarmCreature.Core
         /// <summary>한 틱에 같은 유닛이 무한히 행동하지 않게 막는 상한 (긴 dt 방어).</summary>
         private const int MaxActionsPerTickPerUnit = 8;
 
+        /// <summary>
+        /// 유닛끼리 이 거리보다 가까우면 밀어낸다 (설계 4절).
+        /// <b><see cref="BattleUnit.DefaultAttackRange"/> 보다 작아야 한다</b> —
+        /// 크면 사거리 안에 들기 전에 서로 밀어내 영원히 못 때린다.
+        /// </summary>
+        public const float DefaultMinSpacing = 0.9f;
+
         private readonly List<BattleUnit> allies = new List<BattleUnit>();
         private readonly List<BattleUnit> enemies = new List<BattleUnit>();
         private readonly List<string> log = new List<string>();
+
+        /// <summary>겹침을 막는 최소 간격. 맵마다 다를 수 있어 생성자가 값으로 받는다.</summary>
+        private readonly float minSpacing;
 
         public IReadOnlyList<BattleUnit> Allies
         {
@@ -52,8 +63,21 @@ namespace FarmCreature.Core
 
         public float ElapsedSeconds { get; private set; }
 
-        public BattleSimulator(IList<CreatureInstance> party, IList<EnemyData> foes)
+        /// <summary>
+        /// <paramref name="allyPositions"/> · <paramref name="enemyPositions"/> 는 스폰 좌표다.
+        /// <b>시뮬레이터 안에서는 난수를 부르지 않는다</b> — 배치를 고르는 일은 호출부가 하고,
+        /// 여기서는 받은 좌표를 그대로 쓴다. 그래서 게임은 매번 다르고 테스트는 완전히
+        /// 결정적이다 (설계 3.1).
+        /// </summary>
+        public BattleSimulator(
+            IList<CreatureInstance> party,
+            IList<EnemyData> foes,
+            IList<Vector2> allyPositions,
+            IList<Vector2> enemyPositions,
+            float minSpacing = DefaultMinSpacing)
         {
+            this.minSpacing = minSpacing;
+
             if (party != null)
             {
                 for (int i = 0; i < party.Count; i++)
@@ -78,6 +102,10 @@ namespace FarmCreature.Core
                 }
             }
 
+            // 좌표는 Resolve 보다 먼저 선다 — 규칙이 좌표를 읽기 때문이다.
+            Place(allies, allyPositions);
+            Place(enemies, enemyPositions);
+
             // 한쪽이 비어 있으면 시작하자마자 끝난다. 파티가 비었을 때가 이 경우다.
             Outcome = Resolve();
 
@@ -88,6 +116,20 @@ namespace FarmCreature.Core
             else if (allies.Count == 0)
             {
                 Append("내보낼 케어가 없다.");
+            }
+        }
+
+        /// <summary>
+        /// 좌표가 유닛 수보다 적으면 남는 유닛은 원점에 선다. 짧은 목록은 호출부의 실수지만
+        /// 예외로 죽이지 않는다 — 전투가 안 열리는 것보다 겹쳐 서는 편이 낫다 (설계 3.1).
+        /// </summary>
+        private static void Place(List<BattleUnit> units, IList<Vector2> positions)
+        {
+            for (int i = 0; i < units.Count; i++)
+            {
+                units[i].Position = positions != null && i < positions.Count
+                    ? positions[i]
+                    : Vector2.zero;
             }
         }
 

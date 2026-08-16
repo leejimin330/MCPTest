@@ -166,7 +166,13 @@ namespace FarmCreature.Tests
                 CreatureInstance.CreateNew(hero)
             };
 
-            var battle = new BattleSimulator(party, new[] { dummy });
+            // 원점에 겹쳐 세운다 — 거리 0 이라 항상 사거리 안이고, 이 테스트는 좌표를 보지 않는다.
+            var atOrigin = new System.Collections.Generic.List<UnityEngine.Vector2>
+            {
+                UnityEngine.Vector2.zero
+            };
+
+            var battle = new BattleSimulator(party, new[] { dummy }, atOrigin, atOrigin);
             StringAssert.Contains("전투 중", PanelLabels.BattleTitle(battle));
 
             battle.Tick(1f);

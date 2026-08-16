@@ -26,6 +26,22 @@ namespace FarmCreature.Tests
             return list;
         }
 
+        /// <summary>
+        /// 전원을 원점에 겹쳐 세운다. 거리가 0 이라 <b>항상 사거리 안</b>이므로 이동 구간이 없고,
+        /// 타겟 동률이 목록 순서로 깨져 예전 <c>FirstAlive</c> 와 같은 유닛을 고른다 (설계 6.1).
+        /// 좌표를 보지 않는 기존 테스트는 전부 이것을 쓴다.
+        /// </summary>
+        private static List<Vector2> Clustered(int count)
+        {
+            var points = new List<Vector2>();
+            for (int i = 0; i < count; i++)
+            {
+                points.Add(Vector2.zero);
+            }
+
+            return points;
+        }
+
         // ---- 피해 공식 ----
 
         [Test]
@@ -57,7 +73,7 @@ namespace FarmCreature.Tests
             var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 24, attack: 0, defense: 0,
                 attackInterval: Never, goldReward: 15);
 
-            var battle = new BattleSimulator(Party(hero), new[] { dummy });
+            var battle = new BattleSimulator(Party(hero), new[] { dummy }, Clustered(1), Clustered(1));
             Assert.AreEqual(BattleOutcome.InProgress, battle.Outcome);
 
             battle.Tick(1f);
@@ -74,7 +90,7 @@ namespace FarmCreature.Tests
             var brute = TestFixtures.MakeEnemy("brute", maxHp: 100, attack: 100, defense: 0,
                 attackInterval: 1f);
 
-            var battle = new BattleSimulator(Party(weakling), new[] { brute });
+            var battle = new BattleSimulator(Party(weakling), new[] { brute }, Clustered(1), Clustered(1));
             battle.Tick(1f);
 
             Assert.AreEqual(BattleOutcome.Defeat, battle.Outcome);
@@ -86,7 +102,7 @@ namespace FarmCreature.Tests
         {
             var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 10, attack: 1, defense: 0);
 
-            var battle = new BattleSimulator(new List<CreatureInstance>(), new[] { dummy });
+            var battle = new BattleSimulator(new List<CreatureInstance>(), new[] { dummy }, Clustered(0), Clustered(1));
 
             Assert.AreEqual(BattleOutcome.Defeat, battle.Outcome,
                 "밖에 나온 케어가 없으면 전투가 성립하지 않는다");
@@ -100,7 +116,7 @@ namespace FarmCreature.Tests
             var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 10, attack: 0, defense: 0,
                 attackInterval: Never, goldReward: 7);
 
-            var battle = new BattleSimulator(Party(hero), new[] { dummy });
+            var battle = new BattleSimulator(Party(hero), new[] { dummy }, Clustered(1), Clustered(1));
             battle.Tick(1f);
 
             int logLines = battle.Log.Count;
@@ -124,7 +140,7 @@ namespace FarmCreature.Tests
             var wall = TestFixtures.MakeEnemy("wall", maxHp: 1000, attack: 0, defense: 0,
                 attackInterval: Never);
 
-            var battle = new BattleSimulator(Party(hero), new[] { wall });
+            var battle = new BattleSimulator(Party(hero), new[] { wall }, Clustered(1), Clustered(1));
             var target = battle.Enemies[0];
 
             battle.Tick(1f);
@@ -143,7 +159,7 @@ namespace FarmCreature.Tests
             var wall = TestFixtures.MakeEnemy("wall", maxHp: 1000, attack: 0, defense: 0,
                 attackInterval: Never);
 
-            var battle = new BattleSimulator(Party(hero), new[] { wall });
+            var battle = new BattleSimulator(Party(hero), new[] { wall }, Clustered(1), Clustered(1));
             var target = battle.Enemies[0];
 
             battle.Tick(2.9f);
@@ -162,7 +178,7 @@ namespace FarmCreature.Tests
             var biter = TestFixtures.MakeEnemy("biter", maxHp: 1000, attack: 20, defense: 0,
                 attackInterval: 1f);
 
-            var battle = new BattleSimulator(Party(healer), new[] { biter });
+            var battle = new BattleSimulator(Party(healer), new[] { biter }, Clustered(1), Clustered(1));
             var ally = battle.Allies[0];
 
             battle.Tick(1f);
@@ -215,7 +231,7 @@ namespace FarmCreature.Tests
             var wall = TestFixtures.MakeEnemy("wall", maxHp: 100000, attack: 0, defense: 0,
                 attackInterval: Never);
 
-            var battle = new BattleSimulator(Party(hero), new[] { wall });
+            var battle = new BattleSimulator(Party(hero), new[] { wall }, Clustered(1), Clustered(1));
 
             // 한 틱에 이론상 1만 번 때릴 수 있는 dt 를 넘겨도 상한에서 멈춘다.
             battle.Tick(10f);
@@ -242,7 +258,7 @@ namespace FarmCreature.Tests
 
         private static int RunToEnd(CreatureSpeciesData species, EnemyData enemy)
         {
-            var battle = new BattleSimulator(Party(species), new[] { enemy });
+            var battle = new BattleSimulator(Party(species), new[] { enemy }, Clustered(1), Clustered(1));
 
             int ticks = 0;
             while (battle.Outcome == BattleOutcome.InProgress && ticks < 10000)
@@ -276,6 +292,23 @@ namespace FarmCreature.Tests
 
             Assert.AreEqual(BattleUnit.DefaultMoveSpeed, unit.MoveSpeed, 0.001f);
             Assert.AreEqual(BattleUnit.DefaultAttackRange, unit.AttackRange, 0.001f);
+        }
+
+        [Test]
+        public void Constructor_PlacesUnitsAtGivenPositions()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: Never, cooldownSeconds: Never);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 50, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { dummy },
+                new List<Vector2> { new Vector2(1f, 2f) },
+                new List<Vector2> { new Vector2(-3f, 4f) });
+
+            Assert.AreEqual(new Vector2(1f, 2f), battle.Allies[0].Position);
+            Assert.AreEqual(new Vector2(-3f, 4f), battle.Enemies[0].Position);
         }
     }
 }
