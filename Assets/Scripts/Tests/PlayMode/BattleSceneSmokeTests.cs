@@ -148,7 +148,7 @@ namespace FarmCreature.Tests
             var species = FindRoot().practiceSpecies;
 
             var state = MakeState(species, gold: 30);
-            BattleHandoff.SetRequest(state, encounter);
+            BattleHandoff.SetRequest(state, encounter, null);
 
             yield return LoadScene(BattleSceneName);
             yield return RunUntil(() => BattleHandoff.HasResult);
@@ -178,7 +178,7 @@ namespace FarmCreature.Tests
             Assert.IsTrue(fed.Success, "먹이주기가 실패하면 이 테스트가 무의미해진다");
             int fullnessBefore = state.Target.Fullness;
 
-            BattleHandoff.SetRequest(state, encounter);
+            BattleHandoff.SetRequest(state, encounter, null);
             yield return LoadScene(BattleSceneName);
             yield return RunUntil(() => BattleHandoff.HasResult);
             Assert.IsTrue(BattleHandoff.HasResult, "전투가 끝나지 않았다");
@@ -266,7 +266,7 @@ namespace FarmCreature.Tests
         private static int PeekReward()
         {
             var result = BattleHandoff.TakeResult();
-            BattleHandoff.SetResult(result.Conclusion, result.GoldReward, result.State);
+            BattleHandoff.SetResult(result.Conclusion, result.GoldReward, result.State, result.StageId);
             return result.Conclusion == BattleConclusion.Victory ? result.GoldReward : 0;
         }
 

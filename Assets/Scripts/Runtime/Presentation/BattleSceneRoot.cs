@@ -50,6 +50,12 @@ namespace FarmCreature.Presentation
         private float speed = 1f;
         private bool concluded;
 
+        /// <summary>요청에 실려 온 전장. 스테이지가 속한 맵이 정한다 (설계 2.1).</summary>
+        private BattleMapData requestField;
+
+        /// <summary>이 전투가 어느 스테이지인가. 연습 전투면 빈 문자열이라 진행도가 안 남는다.</summary>
+        private string stageId = string.Empty;
+
         private readonly List<BattleUnitView> shownAllies = new List<BattleUnitView>();
         private readonly List<BattleUnitView> shownEnemies = new List<BattleUnitView>();
         private readonly StringBuilder builder = new StringBuilder();
@@ -69,13 +75,18 @@ namespace FarmCreature.Presentation
             {
                 state = request.State;
                 encounter = request.Encounter;
+                requestField = request.Field;
+                stageId = encounter != null ? encounter.stageId : string.Empty;
             }
             else
             {
                 // 개발 중 전투 씬만 열어보는 일이 잦다. 오류로 죽는 대신 연습 전투로 시작한다 (설계 3.2).
+                // 연습 전투는 진행도를 남기지 않는다 — stageId 가 비면 기록되지 않는다.
                 Debug.Log("[FarmCreature] 전투 요청이 없어 연습 전투로 시작합니다. (전투 씬 단독 Play)");
                 state = BuildPracticeState();
                 encounter = practiceEncounter;
+                requestField = null;
+                stageId = string.Empty;
             }
 
             StartBattle(encounter);
@@ -86,7 +97,11 @@ namespace FarmCreature.Presentation
             var party = LivePartyOf(state);
             var foes = FoesOf(encounter);
 
-            var map = encounter != null && encounter.map != null ? encounter.map : defaultMap;
+            // request.Field → encounter.map → defaultMap 순으로 물러난다 (설계 2.1).
+            // 전장은 이제 StageMap 이 갖고 있으므로 요청에 실려 온다.
+            var map = requestField != null
+                ? requestField
+                : (encounter != null && encounter.map != null ? encounter.map : defaultMap);
 
             // 좌표를 시뮬레이터보다 먼저 고른다 — 이제 배치가 규칙이다 (설계 1.1).
             List<Vector2> allyPoints;
@@ -331,7 +346,8 @@ namespace FarmCreature.Presentation
                         ? BattleConclusion.Victory
                         : BattleConclusion.Defeat,
                     battle.Outcome == BattleOutcome.Victory ? battle.GoldReward : 0,
-                    state);
+                    state,
+                    stageId);
             }
 
             RefreshTexts();
@@ -413,7 +429,7 @@ namespace FarmCreature.Presentation
         {
             if (!concluded)
             {
-                BattleHandoff.SetResult(BattleConclusion.Aborted, 0, state);
+                BattleHandoff.SetResult(BattleConclusion.Aborted, 0, state, stageId);
             }
 
             SceneManager.LoadScene(FarmSceneName);

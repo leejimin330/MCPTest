@@ -53,7 +53,7 @@ namespace FarmCreature.Presentation
                 return;
             }
 
-            BattleHandoff.SetRequest(state, encounter);
+            BattleHandoff.SetRequest(state, encounter, null);   // Task 7 에서 맵의 전장을 넘긴다
             SceneManager.LoadScene(BattleSceneName);
         }
 
