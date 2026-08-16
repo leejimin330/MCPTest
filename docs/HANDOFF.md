@@ -1,4 +1,4 @@
-# 작업 인수인계 — 2026-08-15
+# 작업 인수인계 — 2026-08-16
 
 **프로젝트:** `C:\Users\이지민\UnityProjects\MCPTest` (Unity 6000.2.8f1, 2D)
 **이 문서:** 지금 상태 / 함정 / 다음 할 것. **재개할 때 이것부터 읽는다.**
@@ -8,6 +8,8 @@
 > 8/14 에 **전투가 별도 씬으로 나가면서 실제 전투 화면**이 생겼고,
 > 8/15 에 **상점이 들어오면서 건물이 4동 → 5동**(전투터 신설)이 되고
 > 전투 진입점이 상점 건물에서 전투터 건물로 옮겨져 내용이 또 바뀌었다.
+> 8/16 에 **부화소**가 들어오면서 다섯 동이 전부 패널을 갖게 됐고,
+> **알 → 새 케어**가 이어져 MVP 순환이 닫혔다.
 
 ---
 
@@ -15,13 +17,13 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **175/175 통과** (2026-08-15, 148 + 상점 27) |
+| EditMode 테스트 | **187/187 통과** (2026-08-16, 175 + 부화소 12) |
 | PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절). 맵 폭이 15로 늘어도 영향 없었다 |
 | 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
-| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동**, 패널 5종 닫힘, 상점 행·버튼 개수 = 재고 4, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel), 건물 x 좌표가 맵 안 |
-| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **전투 씬 자동전투** · **상점 구매**(장비·알) · 저장까지 **한 바퀴 가능** |
+| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동이 전부 패널을 연다**, 패널 6종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel), 건물 x 좌표가 맵 안 |
+| 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **전투 씬 자동전투** · **상점 구매**(장비·알) · **알 부화** · 저장까지 **한 바퀴 가능** |
 | Play 확인 | ⚠️ **눈으로는 아직 안 봤다.** 동작은 PlayMode 테스트가 덮고, 보기 좋은가는 8절 |
-| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, 작업 브랜치 `feature/shop` |
+| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, 작업 브랜치 `feature/hatchery` |
 
 > **2026-08-14 에 막힌 버그를 하나 고쳤다.** 그 전까지 씬에는 창고 [장착] 버튼과
 > 전투터 상대 버튼이 **한 개도 없었다** — 즉 장착도 전투도 화면에서 할 수 없었다.
@@ -32,7 +34,7 @@
 | 건물 / 진입점 | 상태 |
 |---|---|
 | 헛간 (x −12) | ✅ 보유 목록 · 파티 편성 · 육성 대상 선택 |
-| 부화소 (x −6) | ❌ **패널 없음.** "알 시스템 준비 중" 로그만 |
+| 부화소 (x −6) | ✅ **`HatchPanel`.** 알을 깨서 헛간에 새 케어를 넣는다. 헛간이 가득 차면 **거부하고 알은 남는다** |
 | 창고 (x 0) | ✅ 장착 / 해제 |
 | 상점 (x +6) | ✅ **`ShopPanel`.** 장비 3종(무쇠 발톱 30 / 돌 껍질 30 / 블룸 스톤 45) + 스프리글링 알(60) 구매. 재고 무한, 되팔기 없음 |
 | 전투터 (x +12) | ✅ **신설.** 인카운터를 고르면 전투 씬으로 간다 (4.1 해소 — 상점 건물에서 옮겨왔다) |
@@ -258,8 +260,13 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 
 세이브 포맷은 **v3 그대로다** — 인벤토리가 문자열 키 기반이라 알 항목이 추가돼도 포맷을 안 바꿔도 된다.
 
-**남은 것은 부화소다.** 알을 깨서 몬스터를 얻는 기능은 아직 없다 — 산 알은 지금은 인벤토리에
-쌓이기만 한다. 7절 참고.
+**부화소도 들어왔다 — 해결됨 (2026-08-16).** 규칙은 `HatchService.TryHatch` 한 곳에 있다.
+**즉시 부화**(대기 시간 없음)이고, **검사를 전부 끝낸 뒤에 알을 소모한다** — 순서를 뒤집으면
+"알은 사라졌는데 케어는 없다" 가 실재한다. 상점(차감 먼저·지급 나중)과 순서만 반대이고 보장은 같다.
+세이브 포맷은 **v3 그대로다** — 부화가 바꾸는 인벤토리와 로스터를 v3 가 이미 저장한다.
+
+**대신 새 한계가 생겼다: 헛간 8마리가 차면 부화가 영구히 막힌다.** 케어를 내보내는 기능이 없어서,
+한 번 가득 차면 산 알이 인벤토리에 영영 쌓인다. 7절의 다음 순번이 이것이다.
 
 ### 4.4 밸런스 — 장비가 진화 속도에 영향을 못 준다
 
@@ -281,9 +288,10 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 클램프에 걸려 가장자리에 붙어 서고 도착 판정도 안 서던 문제였다. 이제 **맵 안쪽**
 (`FarmArea.HalfWidth − 2`)을 목표로 잡도록 고쳤다. 맵을 15로 넓히면서 함께 손봤다.
 
-### 4.7 git 저장소 없음
+### 4.7 git 저장소 없음 — **해결됨 (2026-08-14)**
 
-커밋 이력이 없어 되돌릴 지점이 없다. 사용자가 보류한 상태.
+기본 브랜치 `main`. 기능마다 `feature/*` 브랜치를 파서 작업하고 `--no-ff` 로 병합한다.
+**원격이 없다**(GitHub 미연결) — 되돌릴 지점은 있지만 이 PC 밖에는 사본이 없다.
 
 ---
 
@@ -292,7 +300,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (175개, 2026-08-15)
+### 5.1 테스트 (187개, 2026-08-16)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -304,19 +312,21 @@ Unity.exe -batchmode -runTests \
 
 | 픽스처 | 개수 |  | 픽스처 | 개수 |
 |---|---|---|---|---|
-| `CareActionsTests` | 18 | | `PanelLabelsTests` | 26 |
-| `SaveSerializerTests` | 18 | | `BattleSimulatorTests` | 13 |
-| `GameDataIntegrationTests` | 15 | | `EvolutionEvaluatorTests` | 11 |
+| `PanelLabelsTests` | 30 | | `CareActionsTests` | 18 |
+| `SaveSerializerTests` | 18 | | `GameDataIntegrationTests` | 16 |
+| `BattleSimulatorTests` | 13 | | `EvolutionEvaluatorTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
 | `GameStateTests` | 8 | | `BattleDataTests` | 8 |
 | `SpawnPointPickerTests` | 7 | | `BattleHandoffTests` | 7 |
-| `ShopDataTests` | 6 | | `ShopServiceTests` | 6 |
-| `DataLayerTests` | 5 | | `FarmLayoutTests` | 5 |
-| `PipelineSmokeTests` | 2 | | **합계** | **175** |
+| `HatchServiceTests` | 7 | | `ShopDataTests` | 6 |
+| `ShopServiceTests` | 6 | | `DataLayerTests` | 5 |
+| `FarmLayoutTests` | 5 | | `PipelineSmokeTests` | 2 |
+| | | | **합계** | **187** |
 
-> `ShopDataTests`(6) · `ShopServiceTests`(6) · `FarmLayoutTests`(5) 가 8/15 상점 작업에서 새로 생겼다.
-> `PanelLabelsTests`(21→26) · `GameDataIntegrationTests`(11→15) · `SaveSerializerTests`(17→18) 도
-> 같은 작업에서 늘었다. 148 + 27 = 175.
+> `HatchServiceTests`(7) 가 8/16 부화소 작업에서 새로 생겼고,
+> `PanelLabelsTests`(26→30) · `GameDataIntegrationTests`(15→16) 이 같은 작업에서 늘었다. 175 + 12 = 187.
+>
+> 그 전 8/15 상점 작업에서는 `ShopDataTests`(6) · `ShopServiceTests`(6) · `FarmLayoutTests`(5) 가 생겼다.
 
 > `BattleHandoffTests` 는 정적 상태를 쓴다. `SetUp`/`TearDown` 에서 `BattleHandoff.Clear()`
 > 를 부르지 않으면 테스트끼리 서로를 오염시킨다.
@@ -342,11 +352,15 @@ Unity.exe -batchmode \
 저장된 씬을 **새 프로세스에서 열어** 검사한다. 세 덩어리다:
 
 1. **빌드 설정** — 두 씬이 등록되고 켜져 있는가. 빠지면 `LoadScene` 이 **런타임에** 실패한다
-2. **농장 씬** — 스프라이트 에셋 참조 / **건물 5동**+콜라이더 / GameRoot·CareManager 배선 /
-   **패널 5종(헛간·창고·육성·전투·상점)이 닫혀 있는지** / `battlePanel.encounterDatabase` /
-   **`shopPanel.stockDatabase`·`shopPanel.eggDatabase` 배선** / HUD 텍스트 /
-   버튼 리스너(**비활성 포함**) / 데이터 기반 버튼 개수(**상점 [구매] 버튼·판매 행 개수 = `ShopStockDatabase.Count`**) /
-   **건물 종류 5종이 한 번씩 다 있는가** / **진입점 배선**(상점 건물 → `ShopPanel`, 전투터 건물 → `BattlePanel`) /
+2. **농장 씬** — 스프라이트 에셋 참조 / **건물 5동**+콜라이더 / **다섯 동이 전부 패널을 연다** /
+   GameRoot·CareManager 배선(`panels` **6개**) /
+   **패널 6종(헛간·창고·육성·전투·상점·부화소)이 닫혀 있는지** / `battlePanel.encounterDatabase` /
+   **`shopPanel.stockDatabase`·`shopPanel.eggDatabase` 배선** /
+   **`hatchPanel.eggDatabase`·`careManager`·`titleText` 배선** / HUD 텍스트 /
+   버튼 리스너(**비활성 포함**) / 데이터 기반 버튼 개수(**상점 [구매] 버튼·판매 행 = `ShopStockDatabase.Count`**,
+   **부화소 [부화] 버튼·알 행 = `EggDatabase.eggs.Count`**) /
+   **건물 종류 5종이 한 번씩 다 있는가** / **진입점 배선**(상점 건물 → `ShopPanel`,
+   전투터 건물 → `BattlePanel`, **부화소 건물 → `HatchPanel`**) /
    **건물 x 좌표가 맵(`FarmArea.HalfWidth`=15) 밖으로 안 나갔는가**
 3. **전투 씬** — 스프라이트가 전부 에셋인가 / `BattleSceneRoot` 배선 7종 /
    아군 슬롯 4 · 적 슬롯 8 이 **존재하고 조각이 다 붙어 있고 꺼져 있는지** / 버튼 3개 리스너 / 카메라
@@ -414,14 +428,16 @@ Assets/
                      SpawnPointPicker · BattleHandoff(+BattleConclusion/Request/Result)
                      SaveData · SaveSerializer
                      ShopService                                                          ← 8/15 신설, TryBuy 한 곳
+                     HatchService                                                         ← 8/16 신설, TryHatch 한 곳
       Presentation/  GameRoot · CareManager · GameHud · UiFontApplier
                      GamePanel(추상) · StoragePanel · RaisingPanel · BarnPanel · BattlePanel · ShopPanel
+                     HatchPanel                                                          ← 8/16 신설
                      PanelLabels · PartyField
                      CreatureController · PlayerController · CameraPanController
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
                      BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  18개 파일(픽스처 17 + TestFixtures 헬퍼), 테스트 175개
+    Tests/EditMode/  19개 파일(픽스처 18 + TestFixtures 헬퍼), 테스트 187개
     Tests/PlayMode/  BattleSceneSmokeTests — 씬을 실제로 로드해 돌린다, 테스트 7개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
@@ -431,9 +447,11 @@ docs/
   superpowers/specs/2026-08-13-battle-and-roster-design.md 전투·로스터 설계(사후 기록)
   superpowers/specs/2026-08-14-battle-screen-design.md     전투 화면 설계 ✅ 구현됨
   superpowers/specs/2026-08-15-shop-design.md               상점 설계 ✅ 구현됨
+  superpowers/specs/2026-08-16-hatchery-design.md           부화소 설계 ✅ 구현됨
   superpowers/plans/2026-08-06-...-mvp.md             MVP 구현 계획 + 실행 기록
   superpowers/plans/2026-08-14-battle-screen.md       전투 화면 구현 계획 + 실행 기록
   superpowers/plans/2026-08-15-shop.md                상점 구현 계획(9 태스크) + 실행 기록
+  superpowers/plans/2026-08-16-hatchery.md            부화소 구현 계획(7 태스크) + 실행 기록
 ```
 
 **씬을 손으로 편집하지 말 것.** `GameBootstrap.BuildAll()` 이 전부 생성하므로,
@@ -446,25 +464,33 @@ docs/
 ```
 ✅ 전투 + 전투 화면 (재화 획득)  ──▶  ✅ 상점 (알·장비 구매)
                                           │
-                                          ├──▶  ⬜ 부화소 (알 → 몬스터)   ← 0순위
+                                          ├──▶  ✅ 부화소 (알 → 몬스터)
                                           │              │
                                           │              ▼
-                                          │         ✅ 헛간
+                                          │         ✅ 헛간 ──▶ ⬜ 케어 방출  ← 0순위
                                           │
                                           └──▶  ✅ 창고
 ```
 
-**0순위 — 부화소.** 상점 ✅ → 4.3(알 획득 경로)이 "상점 구매"로 결정됐으니 이제 착수할 수 있다.
-산 알은 지금 인벤토리에 `egg_sprigling` 키로 쌓이기만 하고 **깰 방법이 없다.**
-부화소 건물(x −6)은 이미 서 있지만 클릭하면 "알 시스템 준비 중" 로그만 뜬다 — 패널이 없다.
-`EggData.hatchesInto` 가 부화 결과 종을 이미 들고 있으니, 부화소는 그것을 읽어 로스터에
-새 케어를 추가하고 인벤토리에서 알을 빼는 것이 핵심이 될 것이다.
+**MVP 순환이 닫혔다.** 전투로 재화를 벌고 → 상점에서 알을 사고 → 부화소에서 깨고 →
+헛간에서 키우고 → 다시 전투에 내보낸다. 모든 건물이 제 일을 한다.
 
-**틈날 때 — 상점·전투 화면을 눈으로 한 번 볼 것.** 동작은 PlayMode 테스트가 지키지만
+**0순위 — 케어 방출.** 부화소가 만든 새 한계다(4.3). 헛간 8마리가 차면 부화가 **영구히 막히고**,
+산 알이 인벤토리에 영영 쌓인다. 즉 방금 닫은 순환이 8마리에서 스스로 멈춘다 — 다른 후보들과 달리
+이것만 **이미 만든 것이 안 돌게 하는** 문제다.
+
+> 주의: 함정 3.6 때문에 **보유 목록 순서를 바꿀 수 없다** — 헛간 버튼이 인덱스를 들고 있다.
+> 방출은 "목록에서 빼기"가 아니라 **빈 슬롯을 남기는** 방식이 되어야 할 가능성이 크다.
+> 세이브 v3(보유 배열 + 파티 인덱스 + 대상 인덱스)에 빈 칸이 생기는 것도 함께 볼 것.
+
+**나머지 후보** (0순위를 이것으로 하지 않겠다면 이 중에서 고른다):
+밸런스 재조정(4.4 — 장비가 진화 속도에 영향을 못 준다) / 알 종류 추가 / 진화 선택 UI.
+
+**틈날 때 — 상점·부화소·전투 화면을 눈으로 한 번 볼 것.** 동작은 PlayMode 테스트가 지키지만
 "보기 좋은가"는 사람만 안다. 8절의 남은 항목이 그것이다.
 
 **나중에**: 상호작용 아이템 + "장착 후 특정 상호작용" 진화 경로, 소모품 별도 계통 재도입,
-다단 진화, 진화 선택 UI, 실시간 경과, 실제 아트, 자동 저장, 밸런스 재조정(4.4).
+다단 진화, 실시간 경과(부화 대기 시간 포함), 실제 아트, 자동 저장.
 
 ---
 
@@ -487,6 +513,15 @@ docs/
 > 배경에서 굴리려면 `Application.runInBackground = true` 를 켜라.
 
 **아직 손으로 확인 안 한 것**
+
+**8/16 부화소 — 사람이 눈으로 본 적이 없다.** EditMode 187개·PlayMode 7개·씬 무결성 검사가
+전부 통과했지만, Play 해서 확인한 것은 하나도 없다.
+
+- [ ] 부화소를 누르면 패널이 뜨고 제목에 `헛간 n/8` 이 보인다
+- [ ] 알을 사서 부화시키면 헛간 목록에 새 케어가 늘고, 알 보유 수가 준다
+- [ ] 알이 0개일 때 누르면 "가진 알이 없다" 로그가 뜬다
+- [ ] 헛간이 8마리일 때 누르면 거부되고 알이 그대로다
+- [ ] 부화 패널(900×420)이 화면에 보기 좋은가
 
 **8/15 상점 — 사람이 눈으로 본 적이 없다.** EditMode·PlayMode 테스트와 씬 무결성 검사는
 전부 통과했지만, 실제로 Play 해서 확인한 것은 하나도 없다.
