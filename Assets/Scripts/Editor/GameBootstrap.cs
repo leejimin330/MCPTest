@@ -740,7 +740,7 @@ namespace FarmCreature.EditorTools
             var storagePanel = BuildStoragePanel(panelRoot.transform, careManager, itemDb);
             var raisingPanel = BuildRaisingPanel(panelRoot.transform, careManager);
             var barnPanel = BuildBarnPanel(panelRoot.transform, careManager);
-            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, encounterDb);
+            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager);
             var shopPanel = BuildShopPanel(panelRoot.transform, careManager, shopStock, eggDb);
             var hatchPanel = BuildHatchPanel(panelRoot.transform, careManager, eggDb);
 
@@ -1328,58 +1328,23 @@ namespace FarmCreature.EditorTools
         /// 인카운터 버튼은 <see cref="BattleEncounterDatabase"/> 인덱스를 넘기고,
         /// 전투 자체는 <see cref="BattleSceneRoot"/> 가 별도 씬에서 굴린다.
         /// </summary>
+        /// <summary>
+        /// TASK 8 임시 스텁 — 무결성 검사가 실패하는 것을 보기 위해 최소만 만든다.
+        /// Task 9 에서 6칸 + 페이지 버튼으로 제대로 채운다.
+        /// </summary>
         private static BattlePanel BuildBattlePanel(
-            Transform parent, CareManager careManager, BattleEncounterDatabase encounterDb)
+            Transform parent, CareManager careManager)
         {
-            var panelGo = CreatePanelBackground(parent, "BattlePanel", new Vector2(1100f, 620f));
+            var panelGo = CreatePanelBackground(parent, "BattlePanel", new Vector2(1100f, 700f));
             var panel = panelGo.AddComponent<BattlePanel>();
-            panel.encounterDatabase = encounterDb;
             panel.careManager = careManager;
 
-            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 250f),
+            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 300f),
                 new Vector2(1040f, 50f), TextAnchor.MiddleCenter, 34, Color.white);
             panel.titleText.text = "전투터";
 
-            panel.infoText = CreatePanelText(panelGo.transform, "Info", new Vector2(0f, 175f),
-                new Vector2(1040f, 44f), TextAnchor.MiddleCenter, 26, new Color(0.85f, 0.85f, 0.7f));
-
-            int encounterCount = encounterDb != null ? encounterDb.Count : 0;
-
-            // 0 이면 전투를 시작할 수단이 없는 전투터가 저장된다 (함정 3.9의 일반화).
-            if (encounterCount == 0)
-            {
-                Debug.LogError("[FarmCreature] 전투 패널: 인카운터가 0개다. "
-                    + "BattleEncounterDatabase 참조가 죽었거나(NewScene 이후 로드했는지 확인) 목록이 비어 있다. "
-                    + "encounterDb==null? " + (encounterDb == null));
-            }
-
-            // 한 줄에 3칸, 최대 2줄. 그 이상은 자리가 없다.
-            const int columns = 3;
-            const int maxButtons = columns * 2;
-
-            if (encounterCount > maxButtons)
-            {
-                Debug.LogError("[FarmCreature] 인카운터가 " + encounterCount + "개다. "
-                    + "전투터에는 " + maxButtons + "칸뿐이라 나머지는 화면에서 고를 수 없다. "
-                    + "패널 레이아웃을 늘리거나 인카운터를 줄일 것.");
-            }
-
-            for (int i = 0; i < encounterCount && i < maxButtons; i++)
-            {
-                var encounter = encounterDb.Get(i);
-
-                var button = CreatePanelButton(panelGo.transform, "Encounter" + i,
-                    PanelLabels.EncounterButton(encounter),
-                    new Vector2(-350f + (i % columns) * 350f, 30f - (i / columns) * 120f),
-                    new Vector2(320f, 100f),
-                    new Color(0.68f, 0.36f, 0.34f));
-
-                UnityEventTools.AddIntPersistentListener(
-                    button.onClick, new UnityAction<int>(panel.StartEncounter), i);
-            }
-
             var closeButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
-                new Vector2(0f, -240f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
+                new Vector2(330f, -290f), new Vector2(150f, 56f), new Color(0.4f, 0.4f, 0.46f));
             UnityEventTools.AddVoidPersistentListener(
                 closeButton.onClick, new UnityAction(panel.Close));
 

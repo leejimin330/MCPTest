@@ -263,11 +263,12 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            // 8. 전투터 패널의 인카운터 데이터베이스
+            // 8. 전투터 패널 배선
             var battle = Object.FindFirstObjectByType<BattlePanel>(FindObjectsInactive.Include);
             if (battle != null)
             {
-                failures += RequireRef(report, "battlePanel.encounterDatabase", battle.encounterDatabase);
+                failures += RequireRef(report, "battlePanel.stageDatabase", battle.stageDatabase);
+                failures += RequireRef(report, "battlePanel.itemDatabase", battle.itemDatabase);
                 failures += RequireRef(report, "battlePanel.careManager", battle.careManager);
                 failures += RequireRef(report, "battlePanel.titleText", battle.titleText);
                 failures += RequireRef(report, "battlePanel.infoText", battle.infoText);
@@ -424,19 +425,38 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            if (battle != null && battle.encounterDatabase != null)
+            // 전투터는 데이터 개수가 아니라 **고정 6칸**이다 — 맵·스테이지가 늘어도 씬은 그대로다.
+            // 여기서 데이터 개수를 세면 스테이지를 늘릴 때마다 BuildAll 이 필요해진다 (설계 5절).
+            if (battle != null)
             {
-                int encounters = battle.encounterDatabase.Count;
+                failures += RequireNamedChildren(report, battle.transform, "Row",
+                    BattlePanel.RowsPerPage, "전투터 줄");
+                failures += RequireNamedChildren(report, battle.transform, "Select",
+                    BattlePanel.RowsPerPage, "전투터 [선택] 버튼");
 
-                if (encounters == 0)
+                int battleRowTexts = battle.rowTexts == null ? 0 : battle.rowTexts.Length;
+                if (battleRowTexts != BattlePanel.RowsPerPage)
                 {
-                    report.AppendLine("  [실패] BattleEncounterDatabase 가 비어 있음 — 전투를 시작할 수단이 없다");
+                    report.AppendLine("  [실패] battlePanel.rowTexts 가 "
+                                      + BattlePanel.RowsPerPage + "개가 아님: " + battleRowTexts);
                     failures++;
                 }
 
-                // 자리는 6칸(3×2)뿐이라 인카운터가 더 많아도 버튼은 6개까지만 만든다.
-                int expected = encounters < 6 ? encounters : 6;
-                failures += RequireNamedChildren(report, battle.transform, "Encounter", expected, "전투터 인카운터 버튼");
+                if (battle.stageDatabase != null && battle.stageDatabase.Count == 0)
+                {
+                    report.AppendLine("  [실패] StageMapDatabase 가 비어 있음 — 갈 곳이 없다");
+                    failures++;
+                }
+
+                string[] navButtons = { "PrevPage", "NextPage", "Back" };
+                for (int i = 0; i < navButtons.Length; i++)
+                {
+                    if (battle.transform.Find(navButtons[i]) == null)
+                    {
+                        report.AppendLine("  [실패] 전투터에 " + navButtons[i] + " 버튼이 없음");
+                        failures++;
+                    }
+                }
             }
 
             // 상점 — 행 개수가 재고 목록에서 나온다. 0 이면 참조가 죽은 것이다 (함정 3.9/3.10).

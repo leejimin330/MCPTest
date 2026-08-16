@@ -219,7 +219,13 @@ namespace FarmCreature.Tests
                 care.State.Roster.LeaveParty(care.State.Roster.Party[0]);
             }
 
-            panel.StartEncounter(0);
+            // 전투터는 2단계다 — 먼저 맵을 열고, 그다음 스테이지를 고른다 (설계 5절).
+            panel.SelectRow(0);
+            yield return null;
+            Assert.AreEqual(FarmSceneName, SceneManager.GetActiveScene().name,
+                "맵을 고른 것만으로 씬이 바뀌면 안 된다");
+
+            panel.SelectRow(0);
             yield return null;
 
             Assert.AreEqual(FarmSceneName, SceneManager.GetActiveScene().name,
