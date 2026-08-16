@@ -169,10 +169,28 @@ namespace FarmCreature.Core
                     continue;
                 }
 
+                var target = NearestAlive(opponents, unit.Position);
+                if (target == null)
+                {
+                    continue;
+                }
+
+                // 타이머는 사거리 밖에서도 찬다 — 붙는 순간 바로 나가야 접근 시간이 공백으로
+                // 느껴지지 않는다 (설계 3.2).
                 if (unit.Skill != null && unit.Skill.cooldownSeconds > 0f)
                 {
                     unit.SkillTimer += deltaTime;
+                }
 
+                unit.AttackTimer += deltaTime;
+
+                if (!InRange(unit, target))
+                {
+                    continue;
+                }
+
+                if (unit.Skill != null && unit.Skill.cooldownSeconds > 0f)
+                {
                     int used = 0;
                     while (unit.SkillTimer >= unit.Skill.cooldownSeconds
                            && used < MaxActionsPerTickPerUnit
@@ -185,8 +203,6 @@ namespace FarmCreature.Core
                     }
                 }
 
-                unit.AttackTimer += deltaTime;
-
                 int swings = 0;
                 while (unit.AttackTimer >= unit.AttackInterval
                        && swings < MaxActionsPerTickPerUnit
@@ -194,15 +210,53 @@ namespace FarmCreature.Core
                        && AnyAlive(opponents))
                 {
                     unit.AttackTimer -= unit.AttackInterval;
-                    BasicAttack(unit, opponents);
+                    BasicAttack(unit, target, opponents);
                     swings++;
                 }
             }
         }
 
-        private void BasicAttack(BattleUnit attacker, List<BattleUnit> opponents)
+        /// <summary>
+        /// <paramref name="from"/> 에서 가장 가까운 생존자. <b>거리가 같으면 목록에서 앞선 쪽</b>이다 —
+        /// 동률에 순서를 못 박아야 결과가 재현된다 (설계 3.3).
+        /// </summary>
+        private static BattleUnit NearestAlive(List<BattleUnit> units, Vector2 from)
         {
-            var target = FirstAlive(opponents);
+            BattleUnit best = null;
+            float bestSqr = float.MaxValue;
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (!units[i].IsAlive)
+                {
+                    continue;
+                }
+
+                float sqr = (units[i].Position - from).sqrMagnitude;
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    best = units[i];
+                }
+            }
+
+            return best;
+        }
+
+        private static bool InRange(BattleUnit unit, BattleUnit target)
+        {
+            return (target.Position - unit.Position).sqrMagnitude
+                   <= unit.AttackRange * unit.AttackRange;
+        }
+
+        private void BasicAttack(BattleUnit attacker, BattleUnit target, List<BattleUnit> opponents)
+        {
+            // 앞선 타격으로 타겟이 죽었으면 다시 고른다.
+            if (target == null || !target.IsAlive)
+            {
+                target = NearestAlive(opponents, attacker.Position);
+            }
+
             if (target == null)
             {
                 return;
@@ -233,7 +287,7 @@ namespace FarmCreature.Core
                 return;
             }
 
-            var target = FirstAlive(opponents);
+            var target = NearestAlive(opponents, user.Position);
             if (target == null)
             {
                 return;
@@ -312,19 +366,6 @@ namespace FarmCreature.Core
             }
 
             return false;
-        }
-
-        private static BattleUnit FirstAlive(List<BattleUnit> units)
-        {
-            for (int i = 0; i < units.Count; i++)
-            {
-                if (units[i].IsAlive)
-                {
-                    return units[i];
-                }
-            }
-
-            return null;
         }
 
         /// <summary>비율이 가장 낮은 생존자. 회복 스킬의 대상이다.</summary>

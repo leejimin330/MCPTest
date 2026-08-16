@@ -310,5 +310,67 @@ namespace FarmCreature.Tests
             Assert.AreEqual(new Vector2(1f, 2f), battle.Allies[0].Position);
             Assert.AreEqual(new Vector2(-3f, 4f), battle.Enemies[0].Position);
         }
+
+        // ---------- 타겟과 사거리 ----------
+
+        [Test]
+        public void OutOfRange_NoOneTakesDamage()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: 0.5f, cooldownSeconds: Never);
+            var dummy = TestFixtures.MakeEnemy("dummy", maxHp: 50, attack: 5, defense: 0,
+                attackInterval: 0.5f);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { dummy },
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2> { new Vector2(50f, 0f) });
+
+            battle.Tick(1f);
+
+            Assert.AreEqual(50, battle.Enemies[0].Hp, "사거리 밖인데 맞았다");
+            Assert.AreEqual(battle.Allies[0].MaxHp, battle.Allies[0].Hp, "사거리 밖인데 때렸다");
+        }
+
+        [Test]
+        public void Targets_TheNearestEnemy()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: 0.5f, cooldownSeconds: Never);
+            var far = TestFixtures.MakeEnemy("far", maxHp: 50, attack: 0, defense: 0,
+                attackInterval: Never);
+            var near = TestFixtures.MakeEnemy("near", maxHp: 50, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { far, near },      // 목록 순서는 먼 쪽이 앞
+                new List<Vector2> { Vector2.zero },
+                new List<Vector2> { new Vector2(0.9f, 0f), new Vector2(0.3f, 0f) });
+
+            battle.Tick(1f);
+
+            Assert.AreEqual(50, battle.Enemies[0].Hp, "먼 쪽이 맞았다 — 목록 순서를 따라간 것이다");
+            Assert.Less(battle.Enemies[1].Hp, 50, "가까운 쪽이 맞아야 한다");
+        }
+
+        [Test]
+        public void EqualDistance_BreaksTieByListOrder()
+        {
+            var hero = TestFixtures.MakeFighter("hero", attack: 10, defense: 0, health: 100,
+                attackInterval: 0.5f, cooldownSeconds: Never);
+            var first = TestFixtures.MakeEnemy("first", maxHp: 50, attack: 0, defense: 0,
+                attackInterval: Never);
+            var second = TestFixtures.MakeEnemy("second", maxHp: 50, attack: 0, defense: 0,
+                attackInterval: Never);
+
+            var battle = new BattleSimulator(
+                Party(hero), new[] { first, second },
+                Clustered(1), Clustered(2));       // 셋 다 원점 — 거리가 전부 0
+
+            battle.Tick(1f);
+
+            Assert.Less(battle.Enemies[0].Hp, 50, "동률은 목록에서 앞선 쪽이 맞아야 한다");
+            Assert.AreEqual(50, battle.Enemies[1].Hp);
+        }
     }
 }
