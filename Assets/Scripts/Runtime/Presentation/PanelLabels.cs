@@ -235,6 +235,37 @@ namespace FarmCreature.Presentation
             return egg.displayName + "   " + price + "G   보유 " + owned;
         }
 
+        // ---------- 부화소 ----------
+
+        /// <summary>
+        /// 부화소 제목. <b>헛간 점유율을 상시로 보여준다</b> — 부화가 거부되는 유일한 이유가
+        /// 자리이므로, 버튼을 누르기 전에 보이는 편이 회색 버튼보다 정보가 많다 (설계 1.2).
+        /// </summary>
+        public static string HatchTitle(GameState state)
+        {
+            if (state == null || state.Roster == null)
+            {
+                return "부화소";
+            }
+
+            return "부화소   헛간 " + state.Roster.Count + "/" + Roster.MaxMembers;
+        }
+
+        /// <summary>알 한 줄. 상점 행과 달리 가격이 없고, 대신 <b>무엇이 나오는지</b>가 붙는다.</summary>
+        public static string HatchRow(EggData egg, int owned)
+        {
+            if (egg == null)
+            {
+                return "(빈 칸)";
+            }
+
+            string result = egg.hatchesInto != null && !string.IsNullOrEmpty(egg.hatchesInto.displayName)
+                ? egg.hatchesInto.displayName
+                : "???";
+
+            return egg.displayName + "   보유 " + owned + "   →  " + result;
+        }
+
         public static string GoldLine(int gold)
         {
             return "재화 " + gold;

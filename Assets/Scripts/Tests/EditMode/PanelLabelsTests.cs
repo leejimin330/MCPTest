@@ -283,5 +283,47 @@ namespace FarmCreature.Tests
             Assert.AreEqual("(빈 칸)", PanelLabels.ShopRow((ItemData)null, 30, 0));
             Assert.AreEqual("(빈 칸)", PanelLabels.ShopRow((EggData)null, 60, 0));
         }
+
+        // ---------- 부화소 ----------
+
+        [Test]
+        public void HatchTitle_ShowsBarnOccupancy()
+        {
+            var roster = new Roster();
+            roster.Add(CreatureInstance.CreateNew(species));
+            var state = new GameState(roster, new Inventory(), 0);
+
+            string title = PanelLabels.HatchTitle(state);
+
+            StringAssert.Contains("부화소", title);
+            StringAssert.Contains("1/" + Roster.MaxMembers, title,
+                "부화가 거부되는 유일한 이유가 헛간 자리다 — 누르기 전에 보여야 한다");
+        }
+
+        [Test]
+        public void HatchTitle_WithoutState_StillReadable()
+        {
+            Assert.AreEqual("부화소", PanelLabels.HatchTitle(null));
+        }
+
+        [Test]
+        public void HatchRow_ShowsOwnedCountAndResultSpecies()
+        {
+            // 종 표시 이름을 알 이름과 겹치지 않게 둔다 — 겹치면 결과 종을 빼먹어도 단언이 통과한다.
+            var egg = TestFixtures.MakeEgg("egg_sprigling", "스프리글링 알",
+                TestFixtures.MakeSpecies("sprigling", "새싹이"));
+
+            string row = PanelLabels.HatchRow(egg, 2);
+
+            StringAssert.Contains("스프리글링 알", row);
+            StringAssert.Contains("보유 2", row);
+            StringAssert.Contains("새싹이", row, "무엇이 나오는지 모르고 깨는 것은 이상하다");
+        }
+
+        [Test]
+        public void HatchRow_NullEgg_IsEmptySlot()
+        {
+            Assert.AreEqual("(빈 칸)", PanelLabels.HatchRow(null, 0));
+        }
     }
 }

@@ -164,19 +164,20 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            // 헛간 / 창고 / 상점 / 전투터 넷이 패널을 갖고, 부화소는 아직 없다.
-            if (buildingsWithPanel != 4)
+            // 다섯 동이 전부 패널을 갖는다 (부화소가 2026-08-16 에 합류했다).
+            if (buildingsWithPanel != 5)
             {
-                report.AppendLine("  [실패] 패널이 연결된 건물이 4동이 아님: " + buildingsWithPanel);
+                report.AppendLine("  [실패] 패널이 연결된 건물이 5동이 아님: " + buildingsWithPanel);
                 failures++;
             }
 
-            // 4. 패널 5종 — 저장 시점에는 전부 꺼져 있어야 한다
+            // 4. 패널 6종 — 저장 시점에는 전부 꺼져 있어야 한다
             failures += RequirePanelClosed<BarnPanel>(report, "헛간 패널");
             failures += RequirePanelClosed<StoragePanel>(report, "창고 패널");
             failures += RequirePanelClosed<RaisingPanel>(report, "육성 패널");
             failures += RequirePanelClosed<BattlePanel>(report, "전투 패널");
             failures += RequirePanelClosed<ShopPanel>(report, "상점 패널");
+            failures += RequirePanelClosed<HatchPanel>(report, "부화소 패널");
 
             // 5. GameRoot 배선
             var root = Object.FindFirstObjectByType<GameRoot>(FindObjectsInactive.Include);
@@ -214,9 +215,9 @@ namespace FarmCreature.EditorTools
                 failures += RequireRef(report, "careManager.raisingPanel", care.raisingPanel);
                 failures += RequireRef(report, "careManager.partyField", care.partyField);
 
-                if (care.panels == null || care.panels.Count != 5)
+                if (care.panels == null || care.panels.Count != 6)
                 {
-                    report.AppendLine("  [실패] CareManager.panels 가 5개가 아님: "
+                    report.AppendLine("  [실패] CareManager.panels 가 6개가 아님: "
                                       + (care.panels == null ? 0 : care.panels.Count));
                     failures++;
                 }
@@ -287,6 +288,19 @@ namespace FarmCreature.EditorTools
                 failures += RequireRef(report, "shopPanel.titleText", shop.titleText);
             }
 
+            var hatch = Object.FindFirstObjectByType<HatchPanel>(FindObjectsInactive.Include);
+            if (hatch == null)
+            {
+                report.AppendLine("  [실패] HatchPanel 없음");
+                failures++;
+            }
+            else
+            {
+                failures += RequireRef(report, "hatchPanel.eggDatabase", hatch.eggDatabase);
+                failures += RequireRef(report, "hatchPanel.careManager", hatch.careManager);
+                failures += RequireRef(report, "hatchPanel.titleText", hatch.titleText);
+            }
+
             // 8-2. 건물 종류가 다섯 가지 전부 한 번씩 나오는가.
             // 개수만 세면 같은 종류가 두 번 서 있어도 통과한다.
             var kinds = new System.Collections.Generic.HashSet<BuildingKind>();
@@ -325,6 +339,14 @@ namespace FarmCreature.EditorTools
                     && buildings[i].panel != null && !(buildings[i].panel is BattlePanel))
                 {
                     report.AppendLine("  [실패] 전투터 건물이 전투 패널을 열지 않는다: "
+                                      + buildings[i].panel.GetType().Name);
+                    failures++;
+                }
+
+                if (buildings[i].kind == BuildingKind.Hatchery
+                    && buildings[i].panel != null && !(buildings[i].panel is HatchPanel))
+                {
+                    report.AppendLine("  [실패] 부화소 건물이 부화 패널을 열지 않는다: "
                                       + buildings[i].panel.GetType().Name);
                     failures++;
                 }
@@ -435,6 +457,28 @@ namespace FarmCreature.EditorTools
                 if (rowTexts != expected)
                 {
                     report.AppendLine("  [실패] shopPanel.rowTexts 가 " + expected + "개가 아님: " + rowTexts);
+                    failures++;
+                }
+            }
+
+            // 부화 행·버튼 개수 = 알 종류 수. 0 이면 참조가 죽었다는 뜻이다 (함정 3.9/3.10).
+            if (hatch != null && hatch.eggDatabase != null && hatch.eggDatabase.eggs != null)
+            {
+                int expectedEggs = hatch.eggDatabase.eggs.Count;
+
+                if (expectedEggs == 0)
+                {
+                    report.AppendLine("  [실패] EggDatabase 가 비어 있음 — 깰 알이 없다");
+                    failures++;
+                }
+
+                failures += RequireNamedChildren(report, hatch.transform, "Hatch", expectedEggs, "부화소 [부화] 버튼");
+                failures += RequireNamedChildren(report, hatch.transform, "Row", expectedEggs, "부화소 알 행");
+
+                int hatchRowTexts = hatch.rowTexts == null ? 0 : hatch.rowTexts.Length;
+                if (hatchRowTexts != expectedEggs)
+                {
+                    report.AppendLine("  [실패] hatchPanel.rowTexts 가 " + expectedEggs + "개가 아님: " + hatchRowTexts);
                     failures++;
                 }
             }

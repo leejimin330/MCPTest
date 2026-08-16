@@ -742,21 +742,25 @@ namespace FarmCreature.EditorTools
             var barnPanel = BuildBarnPanel(panelRoot.transform, careManager);
             var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, encounterDb);
             var shopPanel = BuildShopPanel(panelRoot.transform, careManager, shopStock, eggDb);
+            var hatchPanel = BuildHatchPanel(panelRoot.transform, careManager, eggDb);
 
             careManager.panels = new List<GamePanel>
             {
-                storagePanel, raisingPanel, barnPanel, battlePanel, shopPanel
+                storagePanel, raisingPanel, barnPanel, battlePanel, shopPanel, hatchPanel
             };
             careManager.raisingPanel = raisingPanel;
             careManager.partyField = partyField;
 
-            // 건물 → 패널. 부화소만 아직 패널이 없어 "준비 중" 안내가 뜬다.
+            // 건물 → 패널. 다섯 동이 전부 패널을 연다.
             for (int i = 0; i < buildings.Count; i++)
             {
                 switch (buildings[i].kind)
                 {
                     case BuildingKind.Barn:
                         buildings[i].panel = barnPanel;
+                        break;
+                    case BuildingKind.Hatchery:
+                        buildings[i].panel = hatchPanel;
                         break;
                     case BuildingKind.Storage:
                         buildings[i].panel = storagePanel;
@@ -776,6 +780,7 @@ namespace FarmCreature.EditorTools
             barnPanel.gameObject.SetActive(false);
             battlePanel.gameObject.SetActive(false);
             shopPanel.gameObject.SetActive(false);
+            hatchPanel.gameObject.SetActive(false);
 
             // 루트 조립
             var rootGo = new GameObject("GameRoot");
@@ -1157,6 +1162,59 @@ namespace FarmCreature.EditorTools
                 new Vector2(0f, -230f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
             UnityEventTools.AddVoidPersistentListener(
                 closeButton.onClick, new UnityAction(panel.Close));
+
+            return panel;
+        }
+
+        /// <summary>
+        /// 부화소 패널. 행은 <see cref="EggDatabase"/> 인덱스와 1:1 이고
+        /// [부화] 버튼이 그 인덱스를 int 인자로 넘긴다 (함정 3.6).
+        /// 알이 1종뿐이라 상점(620)보다 낮은 420 이다 — 알이 4종을 넘으면 올려야 한다.
+        /// </summary>
+        private static HatchPanel BuildHatchPanel(
+            Transform parent, CareManager careManager, EggDatabase eggDb)
+        {
+            var panelGo = CreatePanelBackground(parent, "HatchPanel", new Vector2(900f, 420f));
+            var panel = panelGo.AddComponent<HatchPanel>();
+            panel.eggDatabase = eggDb;
+            panel.careManager = careManager;
+
+            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 160f),
+                new Vector2(860f, 50f), TextAnchor.MiddleCenter, 34, Color.white);
+            panel.titleText.text = "부화소";
+
+            int rowCount = eggDb != null && eggDb.eggs != null ? eggDb.eggs.Count : 0;
+
+            // 0 은 정상 상황이 아니다 — 참조가 죽었다는 뜻이다 (함정 3.9/3.10).
+            if (rowCount == 0)
+            {
+                Debug.LogError("[FarmCreature] 부화소 패널: 알이 0종이다. "
+                    + "EggDatabase 참조가 죽었거나 비어 있다. eggDb==null? " + (eggDb == null));
+            }
+
+            var rows = new Text[rowCount];
+            float rowY = 60f;
+
+            for (int i = 0; i < rowCount; i++)
+            {
+                rows[i] = CreatePanelText(panelGo.transform, "Row" + i, new Vector2(-150f, rowY),
+                    new Vector2(560f, 50f), TextAnchor.MiddleLeft, 26, Color.white);
+
+                var hatchButton = CreatePanelButton(panelGo.transform, "Hatch" + i, "부화",
+                    new Vector2(300f, rowY), new Vector2(150f, 54f),
+                    new Color(0.55f, 0.45f, 0.28f));
+                UnityEventTools.AddIntPersistentListener(
+                    hatchButton.onClick, new UnityAction<int>(panel.Hatch), i);
+
+                rowY -= 80f;
+            }
+
+            panel.rowTexts = rows;
+
+            var hatchCloseButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
+                new Vector2(0f, -140f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
+            UnityEventTools.AddVoidPersistentListener(
+                hatchCloseButton.onClick, new UnityAction(panel.Close));
 
             return panel;
         }
