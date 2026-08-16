@@ -113,5 +113,14 @@ namespace FarmCreature.Tests
             state.EnsureTarget();
             Assert.AreSame(a, state.Target, "정상 대상은 건드리지 않는다");
         }
+
+        [Test]
+        public void NewState_StartsWithEmptyProgress()
+        {
+            var state = new GameState(new Roster(), new Inventory(), 0);
+
+            Assert.IsNotNull(state.Progress, "진행도는 null 이 아니라 빈 것이다");
+            Assert.AreEqual(0, state.Progress.ClearedStageIds.Count);
+        }
     }
 }

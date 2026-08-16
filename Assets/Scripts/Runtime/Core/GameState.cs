@@ -19,12 +19,16 @@ namespace FarmCreature.Core
         /// <summary>먹이·훈련·장착이 적용될 케어. 헛간에서 고른다.</summary>
         public CreatureInstance Target { get; private set; }
 
+        /// <summary>어떤 스테이지를 깼는가. 세이브 v4 부터 저장된다.</summary>
+        public StageProgress Progress { get; private set; }
+
         public GameState(Roster roster, Inventory inventory, int gold)
         {
             Roster = roster ?? new Roster();
             Inventory = inventory ?? new Inventory();
             Gold = gold < 0 ? 0 : gold;
             Target = Roster.Count > 0 ? Roster.GetMember(0) : null;
+            Progress = new StageProgress();
         }
 
         /// <summary>보유 중인 케어만 대상이 될 수 있다.</summary>
