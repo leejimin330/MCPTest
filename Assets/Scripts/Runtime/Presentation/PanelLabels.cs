@@ -147,6 +147,71 @@ namespace FarmCreature.Presentation
             return inParty ? "복귀" : "내보내기";
         }
 
+        // ---------- 헛간 씬 (보관함) ----------
+
+        public static string BoxTitle(Roster roster)
+        {
+            int count = roster != null ? roster.Count : 0;
+            return "보관함  " + count + " / " + Roster.MaxMembers;
+        }
+
+        /// <summary>
+        /// 보관함 한 칸. 좁은 칸에 들어가야 해서 <see cref="BarnRow"/> 보다 짧게 줄을 나눈다.
+        /// 빈 칸은 <b>빈 문자열이 아니라 "비어 있음"</b>이다 — 격자는 칸이 거기 있다는 것 자체가
+        /// 정보라서, 목록과 달리 빈 칸을 감추지 않는다.
+        /// </summary>
+        public static string BoxCell(CreatureInstance creature, bool inParty)
+        {
+            if (creature == null)
+            {
+                return "비어 있음";
+            }
+
+            string line = CreatureName(creature)
+                          + "\n공 " + creature.GetStat(StatType.Attack)
+                          + "  방 " + creature.GetStat(StatType.Defense)
+                          + "\n체 " + creature.GetStat(StatType.Health)
+                          + "  Exp " + creature.Exp;
+
+            return inParty ? line + "\n[밖]" : line;
+        }
+
+        /// <summary>왼쪽에 세워두는 파티 한 줄. 빈 자리는 자리가 있다는 것을 보여준다.</summary>
+        public static string PartySlotRow(Roster roster, int index)
+        {
+            var party = roster != null ? roster.Party : null;
+
+            if (party == null || index < 0 || index >= party.Count)
+            {
+                return (index + 1) + ".  (빈 자리)";
+            }
+
+            var creature = party[index];
+            return (index + 1) + ".  " + CreatureName(creature)
+                   + "   체 " + creature.GetStat(StatType.Health);
+        }
+
+        /// <summary>헛간지기의 한마디. 상태를 읽어 지금 무엇이 막혀 있는지 알려준다.</summary>
+        public static string KeeperLine(Roster roster)
+        {
+            if (roster == null || roster.Count == 0)
+            {
+                return "헛간지기\n\n\"텅 비었구먼.\n알이라도 하나 깨 오게.\"";
+            }
+
+            if (roster.IsFull)
+            {
+                return "헛간지기\n\n\"자리가 꽉 찼네.\n더는 못 받아.\"";
+            }
+
+            if (roster.Party.Count >= Roster.MaxParty)
+            {
+                return "헛간지기\n\n\"밖에 넷이나 나가 있어.\n그 이상은 무리야.\"";
+            }
+
+            return "헛간지기\n\n\"고르게. 내보낼 놈도,\n키울 놈도 자네가 정해.\"";
+        }
+
         // ---------- 전투 ----------
 
         public static string BattleTitle(BattleSimulator battle)

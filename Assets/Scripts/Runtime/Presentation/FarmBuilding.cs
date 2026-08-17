@@ -37,6 +37,12 @@ namespace FarmCreature.Presentation
         public BuildingKind kind = BuildingKind.Barn;
         public string displayName = "헛간";
 
+        [Tooltip("이 건물이 들어가는 씬. 채워져 있으면 패널 대신 이쪽이 이긴다. GameBootstrap 이 채운다.")]
+        public string sceneName;
+
+        [Tooltip("씬으로 들어갈 때 상태를 들려 보낼 조율자. sceneName 을 쓰면 반드시 필요하다.")]
+        public CareManager careManager;
+
         [Tooltip("이 건물이 여는 패널. 비워두면 '준비 중' 안내만 띄운다. GameBootstrap 이 채운다.")]
         public GamePanel panel;
 
@@ -81,6 +87,14 @@ namespace FarmCreature.Presentation
         {
             if (CameraPanController.DraggedThisGesture)
             {
+                return;
+            }
+
+            // 씬이 정해져 있으면 안으로 들어간다. 패널은 아직 씬이 없는 건물의 방식이다 —
+            // 건물이 하나씩 씬으로 옮겨가는 동안 둘이 공존한다.
+            if (!string.IsNullOrEmpty(sceneName) && careManager != null)
+            {
+                careManager.EnterScene(sceneName);
                 return;
             }
 

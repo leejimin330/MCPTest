@@ -33,17 +33,27 @@ namespace FarmCreature.Tests
         }
 
         [Test]
-        public void Request_RoundTripsStateAndEncounter()
+        public void Request_RoundTripsTheEncounter()
         {
-            var state = MakeState();
             var encounter = TestFixtures.MakeEncounter("들판");
 
-            BattleHandoff.SetRequest(state, encounter, null);
+            BattleHandoff.SetRequest(MakeState(), encounter, null);
             var taken = BattleHandoff.TakeRequest();
 
             Assert.IsNotNull(taken);
-            Assert.AreSame(state, taken.State);
             Assert.AreSame(encounter, taken.Encounter);
+        }
+
+        [Test]
+        public void SetRequest_HandsTheStateToSceneHandoff()
+        {
+            // 짐과 상태를 따로 맡기게 하면 한쪽을 빠뜨릴 수 있고, 그 실패는
+            // "돌아와 보니 진행이 날아갔다" 로만 드러난다. 그래서 여기서 함께 맡긴다.
+            var state = MakeState();
+
+            BattleHandoff.SetRequest(state, TestFixtures.MakeEncounter("들판"), null);
+
+            Assert.AreSame(state, SceneHandoff.TakeState());
         }
 
         [Test]
@@ -64,17 +74,25 @@ namespace FarmCreature.Tests
         }
 
         [Test]
-        public void Result_RoundTripsConclusionRewardAndState()
+        public void Result_RoundTripsConclusionAndReward()
         {
-            var state = MakeState();
-
-            BattleHandoff.SetResult(BattleConclusion.Victory, 24, state, "field_1");
+            BattleHandoff.SetResult(BattleConclusion.Victory, 24, MakeState(), "field_1");
             var taken = BattleHandoff.TakeResult();
 
             Assert.IsNotNull(taken);
             Assert.AreEqual(BattleConclusion.Victory, taken.Conclusion);
             Assert.AreEqual(24, taken.GoldReward);
-            Assert.AreSame(state, taken.State);
+        }
+
+        [Test]
+        public void SetResult_HandsTheStateToSceneHandoff()
+        {
+            var state = MakeState();
+
+            BattleHandoff.SetResult(BattleConclusion.Victory, 24, state, "field_1");
+
+            Assert.AreSame(state, SceneHandoff.TakeState(),
+                "농장이 이 상태를 이어받아야 저장 전 진행이 남는다");
         }
 
         [Test]
@@ -109,6 +127,8 @@ namespace FarmCreature.Tests
 
             Assert.IsFalse(BattleHandoff.HasRequest);
             Assert.IsFalse(BattleHandoff.HasResult);
+            Assert.IsFalse(SceneHandoff.HasState,
+                "짐만 지우고 상태를 남기면 다음 씬이 지난 상태를 이어받는다");
         }
 
         [Test]

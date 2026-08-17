@@ -1,4 +1,4 @@
-# 작업 인수인계 — 2026-08-16
+# 작업 인수인계 — 2026-08-17
 
 **프로젝트:** `C:\Users\이지민\UnityProjects\MCPTest` (Unity 6000.2.8f1, 2D)
 **이 문서:** 지금 상태 / 함정 / 다음 할 것. **재개할 때 이것부터 읽는다.**
@@ -14,6 +14,9 @@
 > 싸운다. **"좌표는 표시 전용"이라는 8/14 의 결정이 뒤집혔다**(2.4절).
 > 이어서 **맵/스테이지 진행 구조**가 들어와 전투터가 2단계가 되고 **순서대로 해금**된다(2.6절).
 > 세이브가 v3 → **v4** 로 올랐다.
+>
+> **8/17 에 건물이 씬으로 나가기 시작했다.** 상태를 나르는 일이 전투만의 문제가 아니게 되어
+> `SceneHandoff` 로 분리됐고, 헛간이 첫 번째 개별 씬이 됐다(2.7절). 씬이 **2개 → 3개**.
 
 ---
 
@@ -21,13 +24,13 @@
 
 | 항목 | 상태 |
 |---|---|
-| EditMode 테스트 | **238/238 통과** (2026-08-16, 205 + 맵/스테이지 33) |
-| PlayMode 스모크 테스트 | **7/7 통과** — 씬을 실제로 로드해 전투가 도는지 본다 (5.4절). **스폰이 랜덤이라 세 번 연속 통과로 확인했다** |
-| 씬 | **2개** — `FarmScene` · `BattleScene`. 둘 다 빌드 설정에 등록됨 |
-| 씬 무결성 검사 | **통과** — 두 씬을 각각 열어 검사한다. **건물 5동이 전부 패널을 연다**, 패널 6종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel), **전투터 줄·[선택] 버튼 고정 6칸**(데이터 개수와 무관), 건물 x 좌표가 맵 안 |
+| EditMode 테스트 | **248/248 통과** (2026-08-17, 238 + 전달자 10) |
+| PlayMode 스모크 테스트 | **14/14 통과** — 씬을 실제로 로드해 돌린다 (5.4절). 전투 7 + **헛간 7**. **세 번 연속 통과로 확인했다** |
+| 씬 | **3개** — `FarmScene` · `BattleScene` · **`BarnScene`**. 전부 빌드 설정에 등록됨 |
+| 씬 무결성 검사 | **통과** — 세 씬을 각각 열어 검사한다. **건물 5동이 전부 진입점을 갖는다**(넷은 패널, 헛간은 씬), 패널 4종 닫힘, 상점 행·버튼 개수 = 재고 4, **부화 행·버튼 개수 = 알 종류 1**, 건물 종류 5종, 진입점 배선(상점→ShopPanel, 전투터→BattlePanel, 부화소→HatchPanel, **헛간→`BarnScene` 문자열 대조**), **전투터 줄·[선택] 버튼 고정 6칸**(데이터 개수와 무관), 건물 x 좌표가 맵 안, **헛간 씬: 방은 켜진 채·팝업은 꺼진 채·부모가 다른가·나가는 버튼이 있는가** |
 | 게임 플레이 | 육성 · 장착 · 진화 · 파티 편성 · **맵→스테이지 선택** · **전투 씬 자동전투** · **상점 구매**(장비·알) · **알 부화** · 저장까지 **한 바퀴 가능** |
-| Play 확인 | **전투는 2026-08-16 에 눈으로 봤다** — 이동·교전·스킬·승패 정상, 겹침 문제를 찾아 고쳤다(4.8). **상점·부화소·농장은 아직 안 봤다.** 남은 항목은 8절 |
-| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, **작업 브랜치 없음**(전부 병합됨) |
+| Play 확인 | **전투는 2026-08-16 에 눈으로 봤다** — 이동·교전·스킬·승패 정상, 겹침 문제를 찾아 고쳤다(4.8). **상점·부화소·농장·헛간 씬은 아직 안 봤다.** 남은 항목은 8절 |
+| git | **저장소 있음** (2026-08-14 에 만듦). 기본 브랜치 `main`, **작업 브랜치 없음**(전부 병합됨). **원격 없음 — GitHub 미연결** |
 
 > **2026-08-14 에 막힌 버그를 하나 고쳤다.** 그 전까지 씬에는 창고 [장착] 버튼과
 > 전투터 상대 버튼이 **한 개도 없었다** — 즉 장착도 전투도 화면에서 할 수 없었다.
@@ -37,13 +40,13 @@
 
 | 건물 / 진입점 | 상태 |
 |---|---|
-| 헛간 (x −12) | ✅ 보유 목록 · 파티 편성 · 육성 대상 선택 |
+| 헛간 (x −12) | ✅ **개별 씬 `BarnScene`.** 왼쪽 헛간지기 + 파티 4줄, 오른쪽 보관함 8칸 격자. 칸을 고르고 아래 버튼으로 내보내기/육성 (2.7절) |
 | 부화소 (x −6) | ✅ **`HatchPanel`.** 알을 깨서 헛간에 새 케어를 넣는다. 헛간이 가득 차면 **거부하고 알은 남는다** |
 | 창고 (x 0) | ✅ 장착 / 해제 |
 | 상점 (x +6) | ✅ **`ShopPanel`.** 장비 3종(무쇠 발톱 30 / 돌 껍질 30 / 블룸 스톤 45) + 스프리글링 알(60) 구매. 재고 무한, 되팔기 없음 |
 | 전투터 (x +12) | ✅ **맵 → 스테이지 2단계.** 맵을 고르고 그 안의 스테이지를 고른다. **순서대로 해금**되고 잠긴 줄에는 이유가 적힌다 (2.6절) |
 | 전투 씬 | ✅ 탑뷰 맵 · 유닛 · 체력바 · 로그 · 배속(1x/2x) · 나가기 |
-| 육성 패널 | ✅ 헛간 줄의 `[육성]` 버튼으로 연다 (먹이 · 훈련 3종 · 저장) |
+| 육성 패널 | ✅ **헛간 씬 안**의 `[육성]` 버튼으로 연다 (먹이 · 훈련 3종 · 저장). 농장에는 없다 |
 | 필드 케어 클릭 | ✅ **헛간으로 돌려보낸다** (육성 패널이 아니다) |
 
 **화면에 상시 버튼이 없다.** 좌상단 상태 패널과 하단 로그 한 줄만 상시로 보이고,
@@ -173,6 +176,33 @@
 - **화면은 고정 6칸을 두 모드가 번갈아 쓴다.** 맵 목록 ↔ 스테이지 목록.
   **그래서 맵이 늘든 스테이지가 늘든 `BuildAll` 이 필요 없다** — 함정 3.1 을 정면으로 푸는 방법이다.
   페이지는 그릴 것이 있을 때만 넘어가고, 모드를 바꾸면 0 으로 돌아간다.
+
+### 2.7 건물별 개별 씬 — 전달자와 헛간 (2026-08-17)
+
+설계 근거는 **`docs/superpowers/specs/2026-08-17-building-scenes-design.md`** 에 있다.
+
+- **상태의 이동을 전투에서 떼어냈다.** `SceneHandoff`(순수 C# 정적)가 `GameState` 를 나른다.
+  `BattleHandoff` 에는 **전투만의 짐**(인카운터·전장·승패·보상·stageId)만 남았다.
+  건물이 5동이면 "저장 안 한 진행이 날아가는" 자리가 5곳이 되는데, 그 규칙이 이제 한 곳에 있다.
+- **짐과 상태를 따로 맡기게 두지 않았다.** `BattleHandoff.SetRequest/SetResult` 가
+  상태를 `SceneHandoff` 에 **함께** 맡긴다. 나눠 두면 한쪽을 빠뜨릴 수 있고,
+  그 실패는 **"돌아와 보니 진행이 날아갔다"** 로만 드러나 원인을 짚기 어렵다.
+- **왕복은 `BuildingSceneRoot`(추상) 한 곳에 있다.** 들어올 때 상태를 받고(없으면 세이브 폴백),
+  나갈 때 그대로 돌려준다. **새 건물 씬은 `DisplayName` 만 적으면 왕복이 끝난다.**
+- **`GameRoot.Start` 의 분기가 줄었다.** `SceneHandoff.TakeState()` 한 줄이 어느 씬에서 왔든
+  처리한다 — **건물이 늘어도 분기가 늘지 않는다.**
+- **건물은 `sceneName` 이 채워져 있으면 씬으로, 비어 있으면 패널로 간다.** 지금은 헛간만 씬이고
+  나머지 넷은 패널이다. **이 공존은 의도된 중간 상태다.**
+- **헛간 화면**: 왼쪽에 헛간지기 초상(자리만 잡은 플레이스홀더)과 한마디, 그 아래 파티 4줄.
+  오른쪽에 **보관함 4×2 격자 8칸**. 칸을 고르면 **그것이 곧 육성 대상**이 되고,
+  아래 `[내보내기/복귀]`·`[육성]`·`[농장으로]` 로 조작한다.
+- **칸 버튼만 인덱스를 들고 있다** (함정 3.6). 옛 헛간 패널은 줄마다 버튼 두 개가 인덱스를
+  들고 있었지만, 격자는 **고르고 → 아래 버튼**이라 조작 버튼이 무인자다.
+- **`BarnRoomPanel` 은 `GamePanel` 이지만 팝업이 아니다** — 씬의 본체라 **열린 채로 저장**된다.
+  함정 3.8("패널은 닫아 저장")은 팝업 규칙이고, 헛간 씬에서는 육성 팝업만 그것을 따른다.
+  `GamePanel` 을 쓰는 이유는 `CareManager` 가 액션 뒤에 다시 그려주는 대상이기 때문이다.
+
+**함정 3.13 을 함께 볼 것** — 방과 팝업의 부모가 같으면 `[육성]` 이 방을 꺼뜨린다.
 
 ---
 
@@ -314,6 +344,21 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 > 테스트가 기본값(0.9)을 쓰고 맵 값을 안 썼기 때문이다. 씬을 실제로 굴리는 검사가
 > 왜 필요한지 보여주는 사례다.
 
+### 3.13 `GamePanel.Open` 은 형제 패널을 닫는다 — 씬의 주 화면과 팝업을 같은 부모에 두지 말 것 ★2026-08-17
+
+`GamePanel.Open` 은 겹쳐 뜨는 것을 막으려고 **부모 아래의 다른 `GamePanel` 을 전부 끈다.**
+헛간 씬에서 방 화면(`BarnRoomPanel`)과 육성 팝업을 한 부모에 두면,
+`[육성]` 을 누르는 순간 **방이 통째로 꺼져 화면이 검게 변한다.** 예외도 로그도 없다.
+
+→ `RoomRoot` / `PopupRoot` 로 부모를 나눴다.
+
+> **이 검사가 실제로 잡는지 확인해 뒀다:** 육성 패널을 `RoomRoot` 밑으로 옮겨 재생성하면
+> `BuildAll` 은 **종료 코드 0** 으로 성공하지만 무결성 검사가 1건을 잡아 1 로 실패하고,
+> PlayMode 의 `RaisingPopup_DoesNotHideTheRoom` 도 함께 실패한다.
+
+**일반화: "겹치지 않게 하나만 띄운다"는 규칙은 팝업의 규칙이다.** 씬의 주 화면이
+같은 타입을 재사용하면 그 규칙에 함께 걸린다. 타입이 아니라 **부모로** 갈라야 한다.
+
 ---
 
 ## 4. 알려진 문제 / 결정 대기
@@ -433,7 +478,7 @@ int rowCount = itemDb != null && itemDb.items != null ? itemDb.items.Count : 0;
 에디터 경로: `C:\Program Files\Unity\Hub\Editor\6000.2.8f1\Editor\Unity.exe`
 **아래 셋 다 Unity 에디터가 닫혀 있어야 한다.**
 
-### 5.1 테스트 (238개, 2026-08-16)
+### 5.1 테스트 (248개, 2026-08-17)
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -450,11 +495,11 @@ Unity.exe -batchmode -runTests \
 | `GameDataIntegrationTests` | 20 | | `EvolutionEvaluatorTests` | 11 |
 | `CreatureInstanceTests` | 10 | | `RosterTests` | 10 |
 | `GameStateTests` | 9 | | `BattleDataTests` | 10 |
-| `SpawnPointPickerTests` | 7 | | `BattleHandoffTests` | 9 |
+| `SpawnPointPickerTests` | 7 | | `BattleHandoffTests` | 11 |
 | `HatchServiceTests` | 7 | | `ShopDataTests` | 6 |
 | `ShopServiceTests` | 6 | | `DataLayerTests` | 5 |
 | `FarmLayoutTests` | 5 | | `PipelineSmokeTests` | 2 |
-| | | | **합계** | **238** |
+| `SceneHandoffTests` | 8 | | **합계** | **248** |
 
 > `BattleSimulatorTests` 가 8/16 위치 기반 전투 작업에서 **13 → 31** 로 늘었다.
 > **기존 13개는 단언이 하나도 안 바뀌었다** — 좌표만 `Clustered(n)` 으로 넘긴다 (2.5절).
@@ -463,8 +508,12 @@ Unity.exe -batchmode -runTests \
 > `PanelLabelsTests`(26→30) · `GameDataIntegrationTests`(15→16) 이 늘었다.
 > 그 전 8/15 상점 작업에서는 `ShopDataTests`(6) · `ShopServiceTests`(6) · `FarmLayoutTests`(5) 가 생겼다.
 
-> `BattleHandoffTests` 는 정적 상태를 쓴다. `SetUp`/`TearDown` 에서 `BattleHandoff.Clear()`
-> 를 부르지 않으면 테스트끼리 서로를 오염시킨다.
+> 8/17 전달자 작업에서 `SceneHandoffTests`(8) 가 생기고 `BattleHandoffTests`(9→11) 이 늘었다.
+>
+> `BattleHandoffTests` · `SceneHandoffTests` 는 정적 상태를 쓴다. `SetUp`/`TearDown` 에서
+> `Clear()` 를 부르지 않으면 테스트끼리 서로를 오염시킨다.
+> **`BattleHandoff.Clear()` 는 `SceneHandoff` 도 함께 비운다** — 짐만 지우고 상태를 남기면
+> 다음 씬이 지난 상태를 이어받는다.
 
 ### 5.2 에셋 + 씬 전량 재생성
 
@@ -476,7 +525,7 @@ Unity.exe -batchmode -quit \
 ```
 에디터 안에서는 메뉴 **FarmCreature → Build All**.
 
-### 5.3 씬 무결성 검사 ★씬을 바꿨으면 반드시 실행 (두 씬을 검사한다)
+### 5.3 씬 무결성 검사 ★씬을 바꿨으면 반드시 실행 (세 씬을 검사한다)
 
 ```bash
 Unity.exe -batchmode \
@@ -484,26 +533,33 @@ Unity.exe -batchmode \
   -executeMethod FarmCreature.EditorTools.SceneIntegrityCheck.Run \
   -logFile "<경로>\integrity.log"
 ```
-저장된 씬을 **새 프로세스에서 열어** 검사한다. 세 덩어리다:
+저장된 씬을 **새 프로세스에서 열어** 검사한다. 네 덩어리다:
 
-1. **빌드 설정** — 두 씬이 등록되고 켜져 있는가. 빠지면 `LoadScene` 이 **런타임에** 실패한다
-2. **농장 씬** — 스프라이트 에셋 참조 / **건물 5동**+콜라이더 / **다섯 동이 전부 패널을 연다** /
-   GameRoot·CareManager 배선(`panels` **6개**) /
-   **패널 6종(헛간·창고·육성·전투·상점·부화소)이 닫혀 있는지** / `battlePanel.encounterDatabase` /
+1. **빌드 설정** — 세 씬이 등록되고 켜져 있는가. 빠지면 `LoadScene` 이 **런타임에** 실패한다
+2. **농장 씬** — 스프라이트 에셋 참조 / **건물 5동**+콜라이더 / **다섯 동이 전부 진입점을 갖는다**
+   (패널이거나 씬) / **씬으로 들어가는 건물에 `careManager` 가 있는가**(없으면 클릭해도 조용히 아무 일이 없다) /
+   GameRoot·CareManager 배선(`panels` **4개**) /
+   **패널 4종(창고·전투·상점·부화소)이 닫혀 있는지** /
    **`shopPanel.stockDatabase`·`shopPanel.eggDatabase` 배선** /
    **`hatchPanel.eggDatabase`·`careManager`·`titleText` 배선** / HUD 텍스트 /
    버튼 리스너(**비활성 포함**) / **전투터는 고정 6칸**(데이터 개수와 무관 — 스테이지를 늘려도 BuildAll 이 필요 없다) /
    데이터 기반 버튼 개수(**상점 [구매] 버튼·판매 행 = `ShopStockDatabase.Count`**,
    **부화소 [부화] 버튼·알 행 = `EggDatabase.eggs.Count`**) /
    **건물 종류 5종이 한 번씩 다 있는가** / **진입점 배선**(상점 건물 → `ShopPanel`,
-   전투터 건물 → `BattlePanel`, **부화소 건물 → `HatchPanel`**) /
+   전투터 건물 → `BattlePanel`, 부화소 건물 → `HatchPanel`,
+   **헛간 건물의 `sceneName` 을 `BarnSceneRoot.SceneName` 과 문자열 대조**) /
    **건물 x 좌표가 맵(`FarmArea.HalfWidth`=15) 밖으로 안 나갔는가**
 3. **전투 씬** — 스프라이트가 전부 에셋인가 / `BattleSceneRoot` 배선 7종 /
    아군 슬롯 4 · 적 슬롯 8 이 **존재하고 조각이 다 붙어 있고 꺼져 있는지** / 버튼 3개 리스너 / 카메라
+4. **헛간 씬** — Image 가 전부 에셋인가 / `BarnSceneRoot` 배선 5종(단독 Play 폴백용 DB 2개 포함) /
+   `BarnRoomPanel` 배선 6종 / **칸 8개·파티 줄 4개가 배열과 실제 오브젝트 양쪽에 있는가** /
+   ★ **방은 켜진 채·육성 팝업은 꺼진 채로 저장됐는가**(다른 씬과 반대다) /
+   ★ **방과 팝업의 부모가 다른가**(함정 3.13) / CareManager 배선(`panels` 2개) /
+   **`ExitToFarm` 버튼이 있는가**(없으면 헛간에 갇힌다) / HUD·카메라
 
 통과 = 종료 코드 0, 실패 = 1.
 
-### 5.4 PlayMode 스모크 테스트 (7개) ★전투 씬을 바꿨으면 실행
+### 5.4 PlayMode 스모크 테스트 (14개) ★전투 씬이나 건물 씬을 바꿨으면 실행
 
 ```bash
 Unity.exe -batchmode -runTests \
@@ -519,10 +575,17 @@ Unity.exe -batchmode -runTests \
 전투를 건드렸으면 **두세 번 돌려** 배치 운에 흔들리지 않는지 본다 (8/16 에 실제로
 어떤 배치에서만 실패하는 상태를 겪었다 — 함정 3.12).
 
-단언하는 것: 양쪽에 유닛이 서는가 / **전장 안에 서는가**(난전이라 구역이 하나다) /
+**전투 7개**(`BattleSceneSmokeTests`)가 단언하는 것: 양쪽에 유닛이 서는가 /
+**전장 안에 서는가**(난전이라 구역이 하나다) /
 **어느 체력바든 줄어드는가**(누가 먼저 맞을지는 배치가 정하므로 특정 슬롯을 지목하지 않는다) /
 전투가 끝나 결과가 전달되는가 / **전투 씬이 재화를 직접 건드리지 않는가** /
 **왕복해도 저장 전 진행이 남고 보상이 한 번만 들어오는가** / 파티가 비면 씬이 안 바뀌는가.
+
+**헛간 7개**(`BarnSceneSmokeTests`)가 단언하는 것: 방이 켜지고 팝업이 닫힌 채 열리는가 /
+단독 Play 에서도 상태가 있는가 / ★ **`[육성]` 이 방을 꺼뜨리지 않는가**(함정 3.13) /
+★ **농장→헛간→농장 왕복에 저장 전 진행이 남는가**(제일 중요하다) /
+**헛간에서 내보낸 케어가 농장 필드에 실제로 서는가** /
+칸을 고르면 육성 대상이 따라오는가 / 빈 칸을 골라도 아무 일이 없는가.
 
 시간은 `Time.timeScale = 10` 으로 압축한다 — `BattleSceneRoot` 가 `Time.deltaTime` 만 쓰므로
 배속과 같은 원리로 그냥 빨라진다.
@@ -555,6 +618,7 @@ Assets/
     EggDatabase.asset · ShopStockDatabase.asset                          ← 8/15 신설
   Scenes/FarmScene.unity            ← 손으로 편집하지 말 것. BuildAll 이 전량 생성
   Scenes/BattleScene.unity          ← 위와 같음
+  Scenes/BarnScene.unity            ← 위와 같음 (8/17 신설)
   Scripts/
     Runtime/
       Data/          StatType · StatBlock · CreatureSpeciesData · ItemData
@@ -569,20 +633,24 @@ Assets/
                      EvolutionEvaluator · Roster · GameState
                      BattleUnit · BattleSimulator          ← 8/16 위치 기반으로 다시 씀 (2.5절)
                      SpawnPointPicker · BattleHandoff(+BattleConclusion/Request/Result)
+                     SceneHandoff                          ← 8/17 신설, 상태의 이동은 여기 한 곳
                      SaveData · SaveSerializer
                      StageProgress · StageUnlockEvaluator                                ← 8/16 신설
                      ShopService                                                          ← 8/15 신설, TryBuy 한 곳
                      HatchService                                                         ← 8/16 신설, TryHatch 한 곳
       Presentation/  GameRoot · CareManager · GameHud · UiFontApplier
-                     GamePanel(추상) · StoragePanel · RaisingPanel · BarnPanel · BattlePanel · ShopPanel
+                     GamePanel(추상) · StoragePanel · RaisingPanel · BattlePanel · ShopPanel
                      HatchPanel                                                          ← 8/16 신설
                      PanelLabels · PartyField
                      CreatureController · PlayerController · CameraPanController
                      FarmArea · FarmBuilding · PlaceholderSprites · SaveSystem
                      BattleField · BattleUnitView · BattleSceneRoot    ← 전투 씬
+                     BuildingSceneRoot(추상) · BarnSceneRoot · BarnRoomPanel  ← 8/17 신설, 건물 씬
+                     (BarnPanel 은 8/17 에 삭제됨 — 헛간 씬이 대신한다)
     Editor/          GameBootstrap · SceneIntegrityCheck
-    Tests/EditMode/  21개 파일(픽스처 20 + TestFixtures 헬퍼), 테스트 238개
-    Tests/PlayMode/  BattleSceneSmokeTests — 씬을 실제로 로드해 돌린다, 테스트 7개
+    Tests/EditMode/  22개 파일(픽스처 21 + TestFixtures 헬퍼), 테스트 248개
+    Tests/PlayMode/  BattleSceneSmokeTests(7) · BarnSceneSmokeTests(7)
+                     — 씬을 실제로 로드해 돌린다, 테스트 14개
 docs/
   PRD.md                                              제품 요구사항 (v1.1, 코드와 동기화됨)
   HANDOFF.md                                          이 문서
@@ -594,6 +662,7 @@ docs/
   superpowers/specs/2026-08-16-hatchery-design.md           부화소 설계 ✅ 구현됨
   superpowers/specs/2026-08-16-battle-melee-design.md       위치 기반 전투 설계 ✅ 구현됨
   superpowers/specs/2026-08-16-stage-progression-design.md  맵/스테이지 설계 ✅ 구현됨
+  superpowers/specs/2026-08-17-building-scenes-design.md    건물별 개별 씬 설계 ✅ 전달자+헛간 구현됨
   superpowers/plans/2026-08-06-...-mvp.md             MVP 구현 계획 + 실행 기록
   superpowers/plans/2026-08-14-battle-screen.md       전투 화면 구현 계획 + 실행 기록
   superpowers/plans/2026-08-15-shop.md                상점 구현 계획(9 태스크) + 실행 기록
@@ -619,25 +688,28 @@ docs/
                                           │
                                           └──▶  ✅ 창고
 
-           ⬜ 건물별 개별 씬  ← 0순위 (표현·전환 계층 전체)
+           ✅ 전달자(SceneHandoff) ──▶ ✅ 헛간 씬 ──▶ ⬜ 부화소·창고·상점·전투터 씬
 ```
 
 **MVP 순환이 닫혔다.** 전투로 재화를 벌고 → 상점에서 알을 사고 → 부화소에서 깨고 →
 헛간에서 키우고 → 다시 전투에 내보낸다. 모든 건물이 제 일을 한다.
 
-**0순위 — 건물별 개별 씬.** 맵/스테이지가 8/16 에 들어가면서 남은 절반이다.
+**0순위 — 남은 네 동을 씬으로.** 8/17 에 어려운 절반이 끝났다.
+전달자(`SceneHandoff`)와 왕복 규칙(`BuildingSceneRoot`)이 서 있으므로,
+**남은 건물은 `DisplayName` 을 적고 방 화면을 그리면 된다.**
 
-지금은 `FarmScene` 하나에 패널 6종이 얹혀 있고 `GameBootstrap` 이 전량 생성한다.
-건물을 클릭하면 패널이 아니라 **개별 씬**으로 들어가게 바꾼다.
+각 건물의 진입은 `FarmBuilding.sceneName` 을 채우고 `GameBootstrap` 에서 패널 생성을
+씬 생성으로 옮기는 일이다. 순서는 **부화소 → 창고 → 상점 → 전투터**를 권한다 —
+앞의 셋은 행이 그대로 옮겨가고, 전투터가 2단계라 가장 손이 많이 간다.
 
-> **가장 큰 위험은 씬 전환마다 "저장 안 한 진행이 날아가는" 자리가 새로 생기는 것이다.**
-> `BattleHandoff` 를 만든 이유가 정확히 그것인데(2.4절), 건물이 5개면 그 자리가 5곳이 된다.
-> 같은 패턴을 일반화한 전달자 하나로 묶는 설계가 필요하다.
->
-> 전투터 화면(맵→스테이지 2단계)은 **행·버튼·문자열이 그대로 옮겨간다** — 그릇만 바뀐다.
+> **전투터를 옮길 때 주의**: 지금 `BattlePanel` 이 `BattleHandoff.SetRequest` 로
+> 전투 씬에 들어간다. 전투터가 씬이 되면 **씬 → 씬** 전환이 되므로,
+> 전투에서 돌아올 곳이 농장인지 전투터인지 정해야 한다.
+> `BuildingSceneRoot.FarmSceneName` 이 하드코딩이라 그때 손봐야 할 곳이다.
 
 **그다음 — 케어 방출.** 헛간 8마리가 차면 부화가 **영구히 막힌다**(4.3).
 함정 3.6 때문에 목록에서 빼는 것이 아니라 **빈 슬롯을 남기는** 방식이 유력하다.
+**헛간이 씬이 되면서 자리는 이미 마련됐다** — 보관함 격자 아래 버튼 한 줄에 들어간다.
 
 **나머지 후보**: 알 종류 추가 / 진화 선택 UI / 종별 사거리·이동속도.
 
@@ -694,6 +766,20 @@ docs/
 > 배경에서 굴리려면 `Application.runInBackground = true` 를 켜라.
 
 **아직 손으로 확인 안 한 것**
+
+**8/17 헛간 씬 — 사람이 눈으로 본 적이 없다.** EditMode 248개·PlayMode 14개·씬 무결성 검사가
+전부 통과했지만, Play 해서 본 것은 하나도 없다. **레이아웃을 처음 잡은 화면이라 여기가 가장 불확실하다.**
+
+- [ ] 헛간을 누르면 씬이 바뀌고, 왼쪽에 초상·한마디·파티 4줄이 보인다
+- [ ] 오른쪽 보관함 4×2 격자가 화면에 알맞게 들어온다 (1920×1080 기준으로 잡았다)
+- [ ] 칸을 누르면 그 칸만 밝아지고, 아래 상세와 버튼 글자가 따라 바뀐다
+- [ ] 나가 있는 케어의 칸이 초록빛으로 구분돼 보인다
+- [ ] `[내보내기]` ↔ `[복귀]` 가 눌리는 대로 바뀌고 왼쪽 파티 줄이 즉시 갱신된다
+- [ ] `[육성]` 을 누르면 팝업이 **방 위에** 뜬다 (방이 꺼지면 함정 3.13 이 되살아난 것이다)
+- [ ] `[농장으로]` 로 나오면 헛간에서 내보낸 케어가 필드에 서 있다
+- [ ] 헛간지기 한마디가 상황(빔·가득참·파티 만원)에 맞게 바뀐다
+- [ ] 한글이 깨지지 않는다 (팝업은 `PopupRoot` 하위라 폰트가 붙어야 정상)
+- [ ] 빈 칸의 "비어 있음" 이 눌러도 되는 것처럼 보이지 않는가
 
 **8/16 부화소 — 사람이 눈으로 본 적이 없다.** EditMode 203개·PlayMode 7개·씬 무결성 검사가
 전부 통과했지만, Play 해서 확인한 것은 하나도 없다.
@@ -774,9 +860,11 @@ docs/
 
 **8/13 에 들어온 것**
 
-- [ ] 헛간에서 파티에 넣고 빼면 필드의 케어가 실제로 늘고 주는가
+- [x] 헛간에서 파티에 넣고 빼면 필드의 케어가 실제로 늘고 주는가
+      — 8/17 에 `RoundTrip_CarriesPartyChangesBackToTheFarmField` 가 기계로 확인했다
 - [ ] 필드의 케어를 클릭하면 헛간으로 돌아가는가
-- [ ] 헛간 `[육성]` 으로 대상을 바꾸면 창고·상태 패널이 같은 케어를 가리키는가
+- [x] 헛간에서 대상을 바꾸면 창고·상태 패널이 같은 케어를 가리키는가
+      — 8/17 에 `SelectingASlot_ChangesTheRaisingTarget` 이 기계로 확인했다 (눈으로는 아직)
 - [ ] 먹이·훈련으로 수치가 즉시 갱신되고, 포만도 부족 시 거부 메시지가 뜨는가
 - [ ] **진화가 실제로 일어나고 필드의 겉모습(색·크기)이 즉시 바뀌는가** — 처음으로 손으로 확인 가능해졌다
 - [ ] 저장 후 재시작하면 보유·파티·육성 대상·재화가 그대로 복원되는가

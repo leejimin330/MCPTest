@@ -16,10 +16,13 @@ namespace FarmCreature.Core
         Aborted
     }
 
-    /// <summary>농장 → 전투 씬으로 넘기는 것.</summary>
+    /// <summary>
+    /// 농장 → 전투 씬으로 넘기는 <b>전투만의 짐</b>.
+    /// <see cref="GameState"/> 는 여기 없다 — 그것은 모든 씬이 공통으로 나르는 것이라
+    /// <see cref="SceneHandoff"/> 가 맡는다.
+    /// </summary>
     public class BattleRequest
     {
-        public GameState State;
         public BattleEncounter Encounter;
 
         /// <summary>
@@ -29,8 +32,8 @@ namespace FarmCreature.Core
     }
 
     /// <summary>
-    /// 전투 씬 → 농장으로 돌려보내는 것.
-    /// <see cref="State"/> 를 함께 돌려주는 이유는 <see cref="BattleHandoff"/> 주석에 있다.
+    /// 전투 씬 → 농장으로 돌려보내는 <b>전투만의 짐</b>.
+    /// 상태는 <see cref="SceneHandoff"/> 로 따로 건너간다.
     /// </summary>
     public class BattleResult
     {
@@ -38,8 +41,6 @@ namespace FarmCreature.Core
 
         /// <summary>승리했을 때 줄 재화. <b>여기서 지급하지 않는다</b> — 농장이 더한다 (설계 3.3).</summary>
         public int GoldReward;
-
-        public GameState State;
 
         /// <summary>
         /// 이긴 스테이지의 id. 농장이 진행도를 기록할 때 쓴다.
@@ -49,14 +50,15 @@ namespace FarmCreature.Core
     }
 
     /// <summary>
-    /// 씬을 넘나들며 상태를 나르는 정적 전달자.
+    /// 전투 씬이 오갈 때의 짐을 나르는 전달자.
     ///
-    /// <b>왜 <c>DontDestroyOnLoad</c> 싱글턴이 아닌가</b>: <see cref="GameState"/> 는 이미 순수 C# 이라
-    /// <c>MonoBehaviour</c> 에 실어 나를 이유가 없고, 정적 클래스는 EditMode 에서 그대로 테스트된다.
+    /// <b>상태는 여기 없다.</b> 예전에는 요청·결과에 <see cref="GameState"/> 를 실었지만,
+    /// 건물마다 씬이 생기면서 "상태를 잃지 않고 씬을 넘는다"가 전투만의 문제가 아니게 됐다.
+    /// 그 절반은 <see cref="SceneHandoff"/> 로 옮겼고, 여기에는 전투만의 짐이 남았다.
     ///
-    /// <b>왜 결과에도 상태를 싣는가</b>: 농장 씬이 다시 로드되면 <c>GameRoot.Start</c> 가 처음부터 돈다.
-    /// 거기서 세이브를 읽으면 저장하지 않은 진행(먹이·훈련·장착)이 전부 날아간다.
-    /// 그래서 들려보낸 상태 객체를 그대로 돌려받아 이어 쓴다.
+    /// <b>그래도 상태를 인자로 받는 이유</b>: 짐과 상태를 따로 맡기게 하면 한쪽을 빠뜨릴 수 있고,
+    /// 그 실패는 "돌아와 보니 진행이 날아갔다" 로만 드러나 원인을 짚기 어렵다.
+    /// 그래서 여기서 <see cref="SceneHandoff"/> 에 함께 맡긴다 — 호출자는 한 번만 부르면 된다.
     ///
     /// <b>꺼내면 비워진다.</b> 남겨두면 농장에 돌아올 때마다 지난 결과가 다시 적용된다.
     /// </summary>
@@ -75,9 +77,13 @@ namespace FarmCreature.Core
             get { return result != null; }
         }
 
+        /// <summary>
+        /// 전투를 시작한다. 짐은 여기 담고, 상태는 <see cref="SceneHandoff"/> 로 함께 맡긴다.
+        /// </summary>
         public static void SetRequest(GameState state, BattleEncounter encounter, BattleMapData field)
         {
-            request = new BattleRequest { State = state, Encounter = encounter, Field = field };
+            request = new BattleRequest { Encounter = encounter, Field = field };
+            SceneHandoff.Carry(state);
         }
 
         /// <summary>요청을 꺼내고 비운다. 없으면 <c>null</c> — 전투 씬을 단독으로 Play 한 경우다.</summary>
@@ -88,6 +94,9 @@ namespace FarmCreature.Core
             return taken;
         }
 
+        /// <summary>
+        /// 전투를 끝낸다. 짐은 여기 담고, 상태는 <see cref="SceneHandoff"/> 로 함께 돌려보낸다.
+        /// </summary>
         public static void SetResult(
             BattleConclusion conclusion, int goldReward, GameState state, string stageId)
         {
@@ -95,9 +104,10 @@ namespace FarmCreature.Core
             {
                 Conclusion = conclusion,
                 GoldReward = goldReward < 0 ? 0 : goldReward,
-                State = state,
                 StageId = stageId
             };
+
+            SceneHandoff.Carry(state);
         }
 
         /// <summary>결과를 꺼내고 비운다. 없으면 <c>null</c> — 전투를 거치지 않고 농장을 연 경우다.</summary>
@@ -108,11 +118,16 @@ namespace FarmCreature.Core
             return taken;
         }
 
-        /// <summary>양쪽을 모두 비운다. 테스트와 새 게임 시작에 쓴다.</summary>
+        /// <summary>
+        /// 양쪽을 모두 비운다. 테스트와 새 게임 시작에 쓴다.
+        /// <see cref="SceneHandoff"/> 도 함께 비운다 — 짐만 지우고 상태를 남기면
+        /// 다음 씬이 지난 상태를 이어받는다.
+        /// </summary>
         public static void Clear()
         {
             request = null;
             result = null;
+            SceneHandoff.Clear();
         }
     }
 }
