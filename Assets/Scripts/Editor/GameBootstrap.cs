@@ -29,6 +29,7 @@ namespace FarmCreature.EditorTools
         private const string ScenesDir = "Assets/Scenes";
         private const string FarmScenePath = ScenesDir + "/FarmScene.unity";
         private const string BattleScenePath = ScenesDir + "/BattleScene.unity";
+        private const string BarnScenePath = ScenesDir + "/BarnScene.unity";
 
         // 씬에 직렬화되려면 스프라이트가 '에셋'이어야 한다.
         // 코드로 만든 런타임 Sprite 는 저장되지 않아 씬을 다시 열면 전부 사라진다.
@@ -98,15 +99,34 @@ namespace FarmCreature.EditorTools
 
             BuildBattleScene(battleScene, battleMap, practiceEncounter, practiceSpecies);
 
-            // 두 씬을 모두 등록한다. 안 하면 LoadScene 이 런타임에 실패한다 (설계 5.1).
+            // ★ 세 번째 NewScene. 위와 같은 이유로 참조를 다시 로드해야 한다 (함정 3.9 / 3.10).
+            var barnScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            ReloadSpriteAssets();
+            var barnSpeciesDb = AssetDatabase.LoadAssetAtPath<SpeciesDatabase>(
+                DataRoot + "/SpeciesDatabase.asset");
+            var barnItemDb = AssetDatabase.LoadAssetAtPath<ItemDatabase>(
+                DataRoot + "/ItemDatabase.asset");
+
+            if (barnSpeciesDb == null || barnItemDb == null)
+            {
+                Debug.LogError("[FarmCreature] 헛간 씬용 에셋 재로드 실패 — "
+                    + "speciesDb==null? " + (barnSpeciesDb == null)
+                    + " itemDb==null? " + (barnItemDb == null));
+            }
+
+            BuildBarnScene(barnScene, barnSpeciesDb, barnItemDb);
+
+            // 세 씬을 모두 등록한다. 안 하면 LoadScene 이 런타임에 실패한다 (설계 5.1).
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(FarmScenePath, true),
-                new EditorBuildSettingsScene(BattleScenePath, true)
+                new EditorBuildSettingsScene(BattleScenePath, true),
+                new EditorBuildSettingsScene(BarnScenePath, true)
             };
 
-            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬 2개를 생성했습니다: "
-                + FarmScenePath + " / " + BattleScenePath);
+            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬 3개를 생성했습니다: "
+                + FarmScenePath + " / " + BattleScenePath + " / " + BarnScenePath);
         }
 
         /// <summary>
@@ -793,27 +813,29 @@ namespace FarmCreature.EditorTools
             panelRoot.transform.SetParent(canvasGo.transform, false);
             StretchFull(panelRoot.GetComponent<RectTransform>());
 
+            // 헛간과 육성은 여기 없다 — 헛간 씬으로 옮겨갔다.
             var storagePanel = BuildStoragePanel(panelRoot.transform, careManager, itemDb);
-            var raisingPanel = BuildRaisingPanel(panelRoot.transform, careManager);
-            var barnPanel = BuildBarnPanel(panelRoot.transform, careManager);
             var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, stageDb, itemDb);
             var shopPanel = BuildShopPanel(panelRoot.transform, careManager, shopStock, eggDb);
             var hatchPanel = BuildHatchPanel(panelRoot.transform, careManager, eggDb);
 
             careManager.panels = new List<GamePanel>
             {
-                storagePanel, raisingPanel, barnPanel, battlePanel, shopPanel, hatchPanel
+                storagePanel, battlePanel, shopPanel, hatchPanel
             };
-            careManager.raisingPanel = raisingPanel;
+            careManager.raisingPanel = null;   // 육성은 헛간 씬 안에 있다
             careManager.partyField = partyField;
 
-            // 건물 → 패널. 다섯 동이 전부 패널을 연다.
+            // 건물 → 패널 또는 씬. 헛간만 씬으로 들어가고 나머지 넷은 아직 패널을 연다.
+            // 둘이 공존하는 것은 의도된 중간 상태다 — 건물이 하나씩 씬으로 옮겨간다.
             for (int i = 0; i < buildings.Count; i++)
             {
+                buildings[i].careManager = careManager;
+
                 switch (buildings[i].kind)
                 {
                     case BuildingKind.Barn:
-                        buildings[i].panel = barnPanel;
+                        buildings[i].sceneName = BarnSceneRoot.SceneName;
                         break;
                     case BuildingKind.Hatchery:
                         buildings[i].panel = hatchPanel;
@@ -832,8 +854,6 @@ namespace FarmCreature.EditorTools
 
             // 배선이 전부 끝난 뒤에 닫는다. 켜 둔 채로 저장하면 시작하자마자 패널이 떠 있다.
             storagePanel.gameObject.SetActive(false);
-            raisingPanel.gameObject.SetActive(false);
-            barnPanel.gameObject.SetActive(false);
             battlePanel.gameObject.SetActive(false);
             shopPanel.gameObject.SetActive(false);
             hatchPanel.gameObject.SetActive(false);
@@ -980,6 +1000,210 @@ namespace FarmCreature.EditorTools
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, BattleScenePath);
+        }
+
+        /// <summary>
+        /// 헛간 안 씬. 왼쪽은 헛간지기와 파티, 오른쪽은 보관함 격자다.
+        ///
+        /// <b>방 화면은 열린 채로 저장한다</b> — 씬의 본체라서 닫아 두면 빈 방이 뜬다.
+        /// 함정 3.8("패널은 닫아 저장")은 팝업 규칙이고, 여기서는 육성 팝업만 그것을 따른다.
+        ///
+        /// <b>방과 팝업의 부모를 나눈 이유</b>: <see cref="GamePanel.Open"/> 은 <b>형제 패널을 닫는다.</b>
+        /// 한 부모에 두면 [육성]을 누르는 순간 방 화면이 통째로 꺼진다.
+        ///
+        /// 칸은 <see cref="Roster.MaxMembers"/> 개, 파티 줄은 <see cref="Roster.MaxParty"/> 개를
+        /// 씬 생성 시점에 고정한다 (함정 3.1).
+        /// </summary>
+        private static void BuildBarnScene(
+            UnityEngine.SceneManagement.Scene scene,
+            SpeciesDatabase speciesDb,
+            ItemDatabase itemDb)
+        {
+            // 카메라 — 방 안은 팬하지 않는다. UI 만 있으므로 배경색만 정한다.
+            var cameraGo = new GameObject("Main Camera");
+            cameraGo.tag = "MainCamera";
+            var camera = cameraGo.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.orthographicSize = 5.4f;
+            camera.backgroundColor = new Color(0.16f, 0.12f, 0.1f);
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+
+            var canvasGo = new GameObject("Canvas",
+                typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(UiFontApplier));
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            new GameObject("EventSystem",
+                typeof(UnityEngine.EventSystems.EventSystem),
+                typeof(UnityEngine.EventSystems.StandaloneInputModule));
+
+            var roomRoot = new GameObject("RoomRoot", typeof(RectTransform));
+            roomRoot.transform.SetParent(canvasGo.transform, false);
+            StretchFull(roomRoot.GetComponent<RectTransform>());
+
+            var popupRoot = new GameObject("PopupRoot", typeof(RectTransform));
+            popupRoot.transform.SetParent(canvasGo.transform, false);
+            StretchFull(popupRoot.GetComponent<RectTransform>());
+
+            var careGo = new GameObject("CareManager");
+            var careManager = careGo.AddComponent<CareManager>();
+            careManager.itemDatabase = itemDb;
+
+            var roomPanel = BuildBarnRoomPanel(roomRoot.transform, careManager);
+            var raisingPanel = BuildRaisingPanel(popupRoot.transform, careManager);
+
+            careManager.panels = new List<GamePanel> { roomPanel, raisingPanel };
+            careManager.raisingPanel = raisingPanel;
+            careManager.partyField = null;   // 필드는 농장에만 있다
+
+            // HUD — 방이 케어 상세를 직접 보여주므로 상태창은 재화·머릿수만 맡는다.
+            var statusText = CreateText(canvasGo.transform, "StatusText",
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f),
+                new Vector2(420f, 200f), TextAnchor.UpperLeft, 24);
+            statusText.color = new Color(0.92f, 0.9f, 0.82f);
+
+            var logText = CreateText(canvasGo.transform, "LogText",
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 40f),
+                new Vector2(1500f, 50f), TextAnchor.MiddleCenter, 26);
+            logText.color = new Color(0.92f, 0.9f, 0.82f);
+
+            var hudGo = new GameObject("GameHud");
+            hudGo.transform.SetParent(canvasGo.transform, false);
+            var hud = hudGo.AddComponent<GameHud>();
+            hud.statusText = statusText;
+            hud.logText = logText;
+
+            var rootGo = new GameObject("BarnSceneRoot");
+            var root = rootGo.AddComponent<BarnSceneRoot>();
+            root.speciesDatabase = speciesDb;
+            root.itemDatabase = itemDb;
+            root.careManager = careManager;
+            root.hud = hud;
+            root.roomPanel = roomPanel;
+
+            // [나가기] 는 방이 아니라 루트의 일이다 — 왕복 규칙이 BuildingSceneRoot 에 있다.
+            var exitButton = CreatePanelButton(roomRoot.transform, "ExitToFarm", "농장으로",
+                new Vector2(690f, -260f), new Vector2(220f, 64f), new Color(0.6f, 0.42f, 0.32f));
+            UnityEventTools.AddVoidPersistentListener(
+                exitButton.onClick, new UnityAction(root.ExitToFarm));
+
+            // 방은 켜진 채로, 팝업은 꺼진 채로 저장한다.
+            roomPanel.gameObject.SetActive(true);
+            raisingPanel.gameObject.SetActive(false);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, BarnScenePath);
+        }
+
+        /// <summary>
+        /// 헛간 방 화면. 칸 버튼만 <b>int 인자 persistent listener</b> 로 자기 번호를 들고 있고
+        /// (함정 3.6), 아래쪽 조작 버튼은 고른 칸을 읽는 무인자 메서드를 부른다.
+        /// </summary>
+        private static BarnRoomPanel BuildBarnRoomPanel(Transform parent, CareManager careManager)
+        {
+            var roomGo = new GameObject("BarnRoomPanel", typeof(RectTransform), typeof(Image));
+            roomGo.transform.SetParent(parent, false);
+            StretchFull(roomGo.GetComponent<RectTransform>());
+
+            var roomImage = roomGo.GetComponent<Image>();
+            roomImage.sprite = squareSprite;
+            roomImage.color = new Color(0.22f, 0.16f, 0.13f, 1f);   // 헛간 바닥
+
+            var panel = roomGo.AddComponent<BarnRoomPanel>();
+            panel.careManager = careManager;
+
+            // ---------- 왼쪽: 헛간지기와 파티 ----------
+
+            var portraitGo = new GameObject("KeeperPortrait", typeof(RectTransform), typeof(Image));
+            portraitGo.transform.SetParent(roomGo.transform, false);
+            CenterRect(portraitGo.GetComponent<RectTransform>(),
+                new Vector2(-600f, 160f), new Vector2(300f, 300f));
+
+            var portrait = portraitGo.GetComponent<Image>();
+            portrait.sprite = squareSprite;
+            portrait.color = new Color(0.52f, 0.42f, 0.3f);   // 실제 그림이 들어올 자리
+            panel.keeperPortrait = portrait;
+
+            panel.keeperText = CreatePanelText(roomGo.transform, "KeeperText",
+                new Vector2(-600f, -60f), new Vector2(360f, 200f),
+                TextAnchor.UpperCenter, 24, new Color(0.9f, 0.86f, 0.74f));
+
+            CreatePanelText(roomGo.transform, "PartyTitle",
+                new Vector2(-600f, -215f), new Vector2(360f, 40f),
+                TextAnchor.MiddleCenter, 26, new Color(0.75f, 0.85f, 0.7f))
+                .text = "밖에 나가 있는 케어";
+
+            var partySlots = new Text[Roster.MaxParty];
+            float partyY = -270f;
+
+            for (int i = 0; i < Roster.MaxParty; i++)
+            {
+                partySlots[i] = CreatePanelText(roomGo.transform, "PartySlot" + i,
+                    new Vector2(-600f, partyY), new Vector2(360f, 42f),
+                    TextAnchor.MiddleLeft, 22, new Color(0.88f, 0.88f, 0.82f));
+                partyY -= 48f;
+            }
+
+            panel.partySlotTexts = partySlots;
+
+            // ---------- 오른쪽: 보관함 격자 ----------
+
+            panel.boxTitleText = CreatePanelText(roomGo.transform, "BoxTitle",
+                new Vector2(420f, 420f), new Vector2(900f, 50f),
+                TextAnchor.MiddleCenter, 34, Color.white);
+            panel.boxTitleText.text = "보관함";
+
+            var cellTexts = new Text[Roster.MaxMembers];
+            var cellBackgrounds = new Image[Roster.MaxMembers];
+
+            for (int i = 0; i < Roster.MaxMembers; i++)
+            {
+                int column = i % BarnRoomPanel.Columns;
+                int row = i / BarnRoomPanel.Columns;
+
+                var position = new Vector2(
+                    420f + (column - (BarnRoomPanel.Columns - 1) * 0.5f) * 224f,
+                    262f - row * 224f);
+
+                var cellButton = CreatePanelButton(roomGo.transform, "Cell" + i, string.Empty,
+                    position, new Vector2(200f, 200f), new Color(0.2f, 0.19f, 0.24f, 0.95f));
+                UnityEventTools.AddIntPersistentListener(
+                    cellButton.onClick, new UnityAction<int>(panel.SelectSlot), i);
+
+                cellBackgrounds[i] = cellButton.GetComponent<Image>();
+
+                // CreatePanelButton 이 만든 라벨을 그대로 칸 글씨로 쓴다. 크기만 칸에 맞춘다.
+                var label = cellButton.GetComponentInChildren<Text>();
+                label.fontSize = 20;
+                CenterRect(label.rectTransform, Vector2.zero, new Vector2(190f, 190f));
+                cellTexts[i] = label;
+            }
+
+            panel.cellTexts = cellTexts;
+            panel.cellBackgrounds = cellBackgrounds;
+
+            // ---------- 아래: 고른 케어와 조작 ----------
+
+            panel.detailText = CreatePanelText(roomGo.transform, "Detail",
+                new Vector2(420f, -160f), new Vector2(900f, 44f),
+                TextAnchor.MiddleCenter, 24, new Color(0.9f, 0.9f, 0.78f));
+
+            var partyButton = CreatePanelButton(roomGo.transform, "TogglePartySelected", "내보내기",
+                new Vector2(180f, -260f), new Vector2(240f, 64f), new Color(0.42f, 0.6f, 0.36f));
+            UnityEventTools.AddVoidPersistentListener(
+                partyButton.onClick, new UnityAction(panel.TogglePartyOfSelected));
+            panel.partyButtonLabel = partyButton.GetComponentInChildren<Text>();
+
+            var raiseButton = CreatePanelButton(roomGo.transform, "RaiseSelected", "육성",
+                new Vector2(440f, -260f), new Vector2(200f, 64f), new Color(0.55f, 0.45f, 0.65f));
+            UnityEventTools.AddVoidPersistentListener(
+                raiseButton.onClick, new UnityAction(panel.RaiseSelected));
+
+            return panel;
         }
 
         /// <summary>
@@ -1326,59 +1550,6 @@ namespace FarmCreature.EditorTools
         /// 각 줄의 버튼이 persistent listener 로 <b>보유 목록 인덱스</b>를 들고 있다.
         /// 그래서 <see cref="Roster"/> 는 보유 순서를 절대 바꾸지 않는다.
         /// </summary>
-        private static BarnPanel BuildBarnPanel(Transform parent, CareManager careManager)
-        {
-            var panelGo = CreatePanelBackground(parent, "BarnPanel", new Vector2(1100f, 760f));
-            var panel = panelGo.AddComponent<BarnPanel>();
-
-            panel.titleText = CreatePanelText(panelGo.transform, "Title", new Vector2(0f, 320f),
-                new Vector2(1040f, 50f), TextAnchor.MiddleCenter, 34, Color.white);
-            panel.titleText.text = "헛간";
-
-            var rows = new Text[Roster.MaxMembers];
-            var partyLabels = new Text[Roster.MaxMembers];
-            var groups = new GameObject[Roster.MaxMembers];
-
-            float rowY = 250f;
-
-            for (int i = 0; i < Roster.MaxMembers; i++)
-            {
-                rows[i] = CreatePanelText(panelGo.transform, "Row" + i, new Vector2(-230f, rowY),
-                    new Vector2(620f, 50f), TextAnchor.MiddleLeft, 24, Color.white);
-
-                // 빈 줄의 버튼을 통째로 숨기려고 묶어 둔다.
-                var group = new GameObject("RowButtons" + i, typeof(RectTransform));
-                group.transform.SetParent(panelGo.transform, false);
-                CenterRect(group.GetComponent<RectTransform>(), new Vector2(0f, rowY),
-                    new Vector2(1040f, 56f));
-                groups[i] = group;
-
-                var partyButton = CreatePanelButton(group.transform, "Party" + i, "내보내기",
-                    new Vector2(210f, 0f), new Vector2(180f, 52f), new Color(0.42f, 0.6f, 0.36f));
-                UnityEventTools.AddIntPersistentListener(
-                    partyButton.onClick, new UnityAction<int>(careManager.DoTogglePartyRow), i);
-                partyLabels[i] = partyButton.GetComponentInChildren<Text>();
-
-                var raiseButton = CreatePanelButton(group.transform, "Raise" + i, "육성",
-                    new Vector2(410f, 0f), new Vector2(150f, 52f), new Color(0.55f, 0.45f, 0.65f));
-                UnityEventTools.AddIntPersistentListener(
-                    raiseButton.onClick, new UnityAction<int>(careManager.DoRaiseRow), i);
-
-                rowY -= 62f;
-            }
-
-            panel.rowTexts = rows;
-            panel.partyButtonLabels = partyLabels;
-            panel.rowButtonGroups = groups;
-
-            var closeButton = CreatePanelButton(panelGo.transform, "Close", "닫기",
-                new Vector2(0f, -305f), new Vector2(220f, 60f), new Color(0.4f, 0.4f, 0.46f));
-            UnityEventTools.AddVoidPersistentListener(
-                closeButton.onClick, new UnityAction(panel.Close));
-
-            return panel;
-        }
-
         /// <summary>
         /// 전투터 패널. <b>행은 항상 6개다</b> — 데이터 개수와 무관하다.
         /// 맵 모드와 스테이지 모드가 같은 6칸을 번갈아 쓰므로, 맵이 늘든 스테이지가 늘든

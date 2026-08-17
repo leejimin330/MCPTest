@@ -22,6 +22,7 @@ namespace FarmCreature.EditorTools
     {
         private const string FarmScenePath = "Assets/Scenes/FarmScene.unity";
         private const string BattleScenePath = "Assets/Scenes/BattleScene.unity";
+        private const string BarnScenePath = "Assets/Scenes/BarnScene.unity";
 
         public static void Run()
         {
@@ -31,10 +32,11 @@ namespace FarmCreature.EditorTools
             failures += CheckBuildSettings(report);
             failures += CheckFarmScene(report);
             failures += CheckBattleScene(report);
+            failures += CheckBarnScene(report);
 
             if (failures == 0)
             {
-                report.AppendLine("결과: 통과 — 두 씬의 모든 참조가 유효합니다.");
+                report.AppendLine("결과: 통과 — 세 씬의 모든 참조가 유효합니다.");
                 Debug.Log("[SceneIntegrityCheck]\n" + report);
                 EditorApplication.Exit(0);
             }
@@ -57,6 +59,7 @@ namespace FarmCreature.EditorTools
 
             failures += RequireSceneRegistered(report, scenes, FarmScenePath);
             failures += RequireSceneRegistered(report, scenes, BattleScenePath);
+            failures += RequireSceneRegistered(report, scenes, BarnScenePath);
 
             report.AppendLine("빌드 설정 씬 " + scenes.Length + "개 검사");
             return failures;
@@ -138,7 +141,7 @@ namespace FarmCreature.EditorTools
                 failures++;
             }
 
-            int buildingsWithPanel = 0;
+            int buildingsWithEntry = 0;
             for (int i = 0; i < buildings.Length; i++)
             {
                 if (buildings[i].GetComponent<BoxCollider2D>() == null)
@@ -147,9 +150,21 @@ namespace FarmCreature.EditorTools
                     failures++;
                 }
 
-                if (buildings[i].panel != null)
+                // 진입점은 패널이거나 씬이다. 둘 다 없으면 눌러도 "준비 중" 만 뜬다.
+                bool entersScene = !string.IsNullOrEmpty(buildings[i].sceneName);
+
+                if (entersScene || buildings[i].panel != null)
                 {
-                    buildingsWithPanel++;
+                    buildingsWithEntry++;
+                }
+
+                // 씬으로 들어가는 건물은 조율자가 있어야 상태를 들려 보낼 수 있다.
+                // 빠지면 클릭해도 아무 일이 없고, 그것이 유일한 증상이다.
+                if (entersScene && buildings[i].careManager == null)
+                {
+                    report.AppendLine("  [실패] 씬으로 들어가는 건물에 careManager 가 없음: "
+                                      + buildings[i].displayName);
+                    failures++;
                 }
 
                 // 건물 x 좌표가 맵 밖으로 나갔는지. FarmLayoutTests 는 GameBootstrap 이
@@ -164,17 +179,16 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            // 다섯 동이 전부 패널을 갖는다 (부화소가 2026-08-16 에 합류했다).
-            if (buildingsWithPanel != 5)
+            // 다섯 동이 전부 진입점을 갖는다 — 넷은 패널, 헛간은 씬이다.
+            if (buildingsWithEntry != 5)
             {
-                report.AppendLine("  [실패] 패널이 연결된 건물이 5동이 아님: " + buildingsWithPanel);
+                report.AppendLine("  [실패] 진입점이 연결된 건물이 5동이 아님: " + buildingsWithEntry);
                 failures++;
             }
 
-            // 4. 패널 6종 — 저장 시점에는 전부 꺼져 있어야 한다
-            failures += RequirePanelClosed<BarnPanel>(report, "헛간 패널");
+            // 4. 패널 4종 — 저장 시점에는 전부 꺼져 있어야 한다.
+            // 헛간·육성은 여기 없다. 헛간 씬으로 옮겨갔다.
             failures += RequirePanelClosed<StoragePanel>(report, "창고 패널");
-            failures += RequirePanelClosed<RaisingPanel>(report, "육성 패널");
             failures += RequirePanelClosed<BattlePanel>(report, "전투 패널");
             failures += RequirePanelClosed<ShopPanel>(report, "상점 패널");
             failures += RequirePanelClosed<HatchPanel>(report, "부화소 패널");
@@ -212,12 +226,12 @@ namespace FarmCreature.EditorTools
             else
             {
                 failures += RequireRef(report, "careManager.itemDatabase", care.itemDatabase);
-                failures += RequireRef(report, "careManager.raisingPanel", care.raisingPanel);
                 failures += RequireRef(report, "careManager.partyField", care.partyField);
 
-                if (care.panels == null || care.panels.Count != 6)
+                // raisingPanel 은 농장에 없다 — 헛간 씬 안에 있다.
+                if (care.panels == null || care.panels.Count != 4)
                 {
-                    report.AppendLine("  [실패] CareManager.panels 가 6개가 아님: "
+                    report.AppendLine("  [실패] CareManager.panels 가 4개가 아님: "
                                       + (care.panels == null ? 0 : care.panels.Count));
                     failures++;
                 }
@@ -349,6 +363,17 @@ namespace FarmCreature.EditorTools
                 {
                     report.AppendLine("  [실패] 부화소 건물이 부화 패널을 열지 않는다: "
                                       + buildings[i].panel.GetType().Name);
+                    failures++;
+                }
+
+                // 헛간은 패널이 아니라 씬으로 들어간다. 이름을 오타로 적어도 클릭이 조용히
+                // 아무것도 안 하므로, 문자열을 코드의 상수와 직접 대조한다.
+                if (buildings[i].kind == BuildingKind.Barn
+                    && buildings[i].sceneName != BarnSceneRoot.SceneName)
+                {
+                    report.AppendLine("  [실패] 헛간 건물의 sceneName 이 "
+                                      + BarnSceneRoot.SceneName + " 이 아님: '"
+                                      + buildings[i].sceneName + "'");
                     failures++;
                 }
             }
@@ -503,12 +528,188 @@ namespace FarmCreature.EditorTools
                 }
             }
 
-            // 헛간은 데이터가 아니라 상한으로 줄 수가 고정된다.
-            var barn = Object.FindFirstObjectByType<BarnPanel>(FindObjectsInactive.Include);
-            if (barn != null)
+            return failures;
+        }
+
+        /// <summary>
+        /// 헛간 씬. 농장·전투와 다른 것을 단언한다 — <b>방 화면은 켜진 채로, 육성 팝업은 꺼진 채로</b>
+        /// 저장돼야 하고(다른 씬은 전부 꺼진 채가 정답이다), 칸은 데이터가 아니라
+        /// <see cref="Roster.MaxMembers"/> 로 고정된다.
+        /// </summary>
+        private static int CheckBarnScene(StringBuilder report)
+        {
+            int failures = 0;
+
+            var scene = EditorSceneManager.OpenScene(BarnScenePath, OpenSceneMode.Single);
+            report.AppendLine("씬 열기: " + scene.path + " (루트 " + scene.rootCount + "개)");
+
+            // 1. Image 스프라이트가 전부 에셋인가 (함정 3.1)
+            var images = Object.FindObjectsByType<UnityEngine.UI.Image>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            for (int i = 0; i < images.Length; i++)
             {
-                failures += RequireNamedChildren(report, barn.transform, "RowButtons",
-                    Roster.MaxMembers, "헛간 줄 버튼 묶음");
+                if (images[i].sprite == null
+                    || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(images[i].sprite)))
+                {
+                    report.AppendLine("  [실패] 헛간 씬: 에셋이 아닌 Image 스프라이트: "
+                                      + Path(images[i].transform));
+                    failures++;
+                }
+            }
+
+            report.AppendLine("헛간 씬 UI Image " + images.Length + "개 검사");
+
+            // 2. BarnSceneRoot 배선. 단독 Play 폴백이 세이브를 읽으려면 DB 두 개가 필요하다.
+            var root = Object.FindFirstObjectByType<BarnSceneRoot>(FindObjectsInactive.Include);
+            if (root == null)
+            {
+                report.AppendLine("  [실패] BarnSceneRoot 없음");
+                return failures + 1;
+            }
+
+            failures += RequireRef(report, "barnRoot.speciesDatabase", root.speciesDatabase);
+            failures += RequireRef(report, "barnRoot.itemDatabase", root.itemDatabase);
+            failures += RequireRef(report, "barnRoot.careManager", root.careManager);
+            failures += RequireRef(report, "barnRoot.hud", root.hud);
+            failures += RequireRef(report, "barnRoot.roomPanel", root.roomPanel);
+
+            // 3. 방 화면 배선과 칸 개수
+            var room = Object.FindFirstObjectByType<BarnRoomPanel>(FindObjectsInactive.Include);
+            if (room == null)
+            {
+                report.AppendLine("  [실패] BarnRoomPanel 없음");
+                return failures + 1;
+            }
+
+            failures += RequireRef(report, "roomPanel.careManager", room.careManager);
+            failures += RequireRef(report, "roomPanel.boxTitleText", room.boxTitleText);
+            failures += RequireRef(report, "roomPanel.keeperText", room.keeperText);
+            failures += RequireRef(report, "roomPanel.keeperPortrait", room.keeperPortrait);
+            failures += RequireRef(report, "roomPanel.detailText", room.detailText);
+            failures += RequireRef(report, "roomPanel.partyButtonLabel", room.partyButtonLabel);
+
+            int cellTexts = room.cellTexts == null ? 0 : room.cellTexts.Length;
+            if (cellTexts != Roster.MaxMembers)
+            {
+                report.AppendLine("  [실패] roomPanel.cellTexts 가 " + Roster.MaxMembers
+                                  + "개가 아님: " + cellTexts);
+                failures++;
+            }
+
+            int cellBackgrounds = room.cellBackgrounds == null ? 0 : room.cellBackgrounds.Length;
+            if (cellBackgrounds != Roster.MaxMembers)
+            {
+                report.AppendLine("  [실패] roomPanel.cellBackgrounds 가 " + Roster.MaxMembers
+                                  + "개가 아님: " + cellBackgrounds);
+                failures++;
+            }
+
+            int partySlots = room.partySlotTexts == null ? 0 : room.partySlotTexts.Length;
+            if (partySlots != Roster.MaxParty)
+            {
+                report.AppendLine("  [실패] roomPanel.partySlotTexts 가 " + Roster.MaxParty
+                                  + "개가 아님: " + partySlots);
+                failures++;
+            }
+
+            // 칸 버튼이 실제로 만들어졌는가. 배열만 채우고 버튼을 안 만들면 눌 곳이 없다.
+            failures += RequireNamedChildren(report, room.transform, "Cell",
+                Roster.MaxMembers, "보관함 칸 버튼");
+            failures += RequireNamedChildren(report, room.transform, "PartySlot",
+                Roster.MaxParty, "파티 줄");
+
+            // 4. ★ 방은 켜진 채로, 육성 팝업은 꺼진 채로 저장돼야 한다.
+            // 방을 끄면 빈 방이 뜨고, 팝업을 켜면 들어가자마자 육성창이 덮는다.
+            if (!room.gameObject.activeSelf)
+            {
+                report.AppendLine("  [실패] 방 화면이 꺼진 채로 저장됨 — 들어가면 빈 방이 뜬다");
+                failures++;
+            }
+
+            failures += RequirePanelClosed<RaisingPanel>(report, "육성 패널(헛간 씬)");
+
+            // 5. ★ 방과 팝업의 부모가 달라야 한다.
+            // GamePanel.Open 은 형제 패널을 닫는다 — 한 부모에 있으면 [육성]을 누르는 순간
+            // 방 화면이 통째로 꺼진다. 화면이 검게 변하는 것이 유일한 증상이다.
+            var raising = Object.FindFirstObjectByType<RaisingPanel>(FindObjectsInactive.Include);
+            if (raising != null && raising.transform.parent == room.transform.parent)
+            {
+                report.AppendLine("  [실패] 방과 육성 팝업의 부모가 같다 — "
+                                  + "[육성]을 누르면 방 화면이 함께 꺼진다");
+                failures++;
+            }
+
+            // 6. CareManager 배선 — 방과 팝업 둘 다 들고 있어야 액션 뒤에 다시 그려진다
+            var care = Object.FindFirstObjectByType<CareManager>(FindObjectsInactive.Include);
+            if (care == null)
+            {
+                report.AppendLine("  [실패] 헛간 씬에 CareManager 없음");
+                failures++;
+            }
+            else
+            {
+                failures += RequireRef(report, "헛간 careManager.itemDatabase", care.itemDatabase);
+                failures += RequireRef(report, "헛간 careManager.raisingPanel", care.raisingPanel);
+
+                if (care.panels == null || care.panels.Count != 2)
+                {
+                    report.AppendLine("  [실패] 헛간 CareManager.panels 가 2개가 아님: "
+                                      + (care.panels == null ? 0 : care.panels.Count));
+                    failures++;
+                }
+            }
+
+            // 7. 나가는 길이 있는가. 없으면 헛간에 갇힌다.
+            var exit = Object.FindObjectsByType<UnityEngine.UI.Button>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            bool hasExit = false;
+            int wired = 0;
+
+            for (int i = 0; i < exit.Length; i++)
+            {
+                if (exit[i].onClick.GetPersistentEventCount() > 0
+                    && !string.IsNullOrEmpty(exit[i].onClick.GetPersistentMethodName(0))
+                    && exit[i].onClick.GetPersistentTarget(0) != null)
+                {
+                    wired++;
+
+                    if (exit[i].onClick.GetPersistentMethodName(0) == "ExitToFarm")
+                    {
+                        hasExit = true;
+                    }
+                }
+                else
+                {
+                    report.AppendLine("  [실패] 헛간 씬: 리스너 없는 버튼: " + Path(exit[i].transform));
+                    failures++;
+                }
+            }
+
+            if (!hasExit)
+            {
+                report.AppendLine("  [실패] 농장으로 나가는 버튼이 없음 — 헛간에 갇힌다");
+                failures++;
+            }
+
+            report.AppendLine("헛간 씬 버튼 " + exit.Length + "개 중 연결됨 " + wired + "개");
+
+            // 8. HUD·카메라
+            var hud = Object.FindFirstObjectByType<GameHud>(FindObjectsInactive.Include);
+            if (hud == null)
+            {
+                report.AppendLine("  [실패] 헛간 씬에 GameHud 없음");
+                failures++;
+            }
+            else
+            {
+                failures += RequireRef(report, "헛간 hud.logText", hud.logText);
+            }
+
+            if (Object.FindFirstObjectByType<Camera>(FindObjectsInactive.Include) == null)
+            {
+                report.AppendLine("  [실패] 헛간 씬에 카메라가 없음");
+                failures++;
             }
 
             return failures;
