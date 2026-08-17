@@ -29,19 +29,20 @@ namespace FarmCreature.Presentation
 
         private void Start()
         {
-            GameState state;
-            string message;
+            // 다른 씬(전투·건물)에서 돌아왔는가? 세이브를 다시 읽으면 저장 전 진행
+            // (먹이·훈련·장착·파티 편성)이 날아가므로, 들려보냈던 상태를 그대로 이어받는다.
+            // 어느 씬에서 왔든 이 한 줄이 그것을 처리한다 — 건물이 늘어도 분기가 늘지 않는다.
+            var state = SceneHandoff.TakeState();
+            string message = SceneHandoff.TakePendingMessage();
 
-            // 전투에서 돌아왔는가? 세이브를 다시 읽으면 저장 전 진행(먹이·훈련·장착)이 날아가므로,
-            // 전투에 들려보냈던 상태를 그대로 이어받는다.
+            // 전투만의 짐은 따로 온다. 상태 위에 보상과 진행도를 얹는 것이라 순서가 중요하다.
             var battleResult = BattleHandoff.TakeResult();
-
-            if (battleResult != null && battleResult.State != null)
+            if (state != null && battleResult != null)
             {
-                state = battleResult.State;
                 message = ApplyBattleResult(state, battleResult);
             }
-            else
+
+            if (state == null)
             {
                 string error;
 
@@ -59,6 +60,10 @@ namespace FarmCreature.Presentation
                     state = BuildNewGame();
                     message = "새로운 케어들을 맞이했다.";
                 }
+            }
+            else if (string.IsNullOrEmpty(message))
+            {
+                message = "농장으로 돌아왔다.";
             }
 
             if (hud != null)

@@ -166,6 +166,30 @@ namespace FarmCreature.Presentation
             SetLog(result.Message);
         }
 
+        // ---------- 씬 이동 ----------
+
+        /// <summary>
+        /// 건물 안 씬으로 들어간다. <b>상태를 들려 보내는 것이 핵심이다</b> —
+        /// 안 보내면 그 씬이 세이브를 다시 읽어 저장 전 진행이 전부 날아간다.
+        /// 돌려받는 것은 <see cref="BuildingSceneRoot.ExitToFarm"/> 가 맡는다.
+        /// </summary>
+        public void EnterScene(string sceneName)
+        {
+            if (string.IsNullOrEmpty(sceneName))
+            {
+                return;
+            }
+
+            if (state == null)
+            {
+                SetLog("아직 들어갈 수 없다.");
+                return;
+            }
+
+            SceneHandoff.Carry(state);
+            UnityEngine.SceneManagement.SceneManager.LoadScene(sceneName);
+        }
+
         // ---------- 저장 ----------
 
         public void DoSave()

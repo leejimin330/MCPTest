@@ -271,11 +271,16 @@ namespace FarmCreature.Tests
             return new GameState(roster, new Inventory(), gold);
         }
 
-        /// <summary>결과를 꺼내지 않고 보상액만 본다 — 꺼내면 농장이 받을 것이 사라진다.</summary>
+        /// <summary>
+        /// 결과를 꺼내지 않고 보상액만 본다 — 꺼내면 농장이 받을 것이 사라진다.
+        /// 상태는 이제 <see cref="SceneHandoff"/> 로 따로 오므로 그쪽도 함께 되돌린다.
+        /// </summary>
         private static int PeekReward()
         {
             var result = BattleHandoff.TakeResult();
-            BattleHandoff.SetResult(result.Conclusion, result.GoldReward, result.State, result.StageId);
+            var carried = SceneHandoff.TakeState();
+
+            BattleHandoff.SetResult(result.Conclusion, result.GoldReward, carried, result.StageId);
             return result.Conclusion == BattleConclusion.Victory ? result.GoldReward : 0;
         }
 

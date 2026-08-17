@@ -68,12 +68,15 @@ namespace FarmCreature.Presentation
 
             HideAllSlots();
 
+            // 짐은 BattleHandoff 에, 상태는 SceneHandoff 에 실려 온다. 둘은 함께 맡겨지므로
+            // 요청이 있으면 상태도 있다 (BattleHandoff.SetRequest 주석).
             var request = BattleHandoff.TakeRequest();
+            var carried = SceneHandoff.TakeState();
             BattleEncounter encounter;
 
-            if (request != null)
+            if (request != null && carried != null)
             {
-                state = request.State;
+                state = carried;
                 encounter = request.Encounter;
                 requestField = request.Field;
                 stageId = encounter != null ? encounter.stageId : string.Empty;
