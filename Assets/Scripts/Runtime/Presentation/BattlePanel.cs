@@ -27,6 +27,9 @@ namespace FarmCreature.Presentation
         [Tooltip("항상 6개다. 데이터 개수와 무관하다. GameBootstrap 이 채운다.")]
         public Text[] rowTexts;
 
+        [Tooltip("빈 줄의 [선택] 버튼을 숨긴다. rowTexts 와 길이가 같아야 한다. GameBootstrap 이 채운다.")]
+        public GameObject[] rowButtons;
+
         [Tooltip("맵 목록. GameBootstrap 이 채운다.")]
         public StageMapDatabase stageDatabase;
 
@@ -110,12 +113,19 @@ namespace FarmCreature.Presentation
 
             for (int i = 0; i < rowTexts.Length; i++)
             {
-                if (rowTexts[i] == null)
+                string text = RowTextAt(map, page * RowsPerPage + i);
+
+                if (rowTexts[i] != null)
                 {
-                    continue;
+                    rowTexts[i].text = text;
                 }
 
-                rowTexts[i].text = RowTextAt(map, page * RowsPerPage + i);
+                // 빈 줄의 [선택]을 숨긴다. 누르면 아무 일도 없지만, 보이면 고를 수 있는
+                // 것처럼 읽힌다 — 맵이 하나뿐일 때 죽은 버튼 5개가 떠 있었다.
+                if (rowButtons != null && i < rowButtons.Length && rowButtons[i] != null)
+                {
+                    rowButtons[i].SetActive(!string.IsNullOrEmpty(text));
+                }
             }
         }
 
