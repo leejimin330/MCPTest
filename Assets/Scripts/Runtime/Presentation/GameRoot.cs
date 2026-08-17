@@ -36,10 +36,11 @@ namespace FarmCreature.Presentation
             string message = SceneHandoff.TakePendingMessage();
 
             // 전투만의 짐은 따로 온다. 상태 위에 보상과 진행도를 얹는 것이라 순서가 중요하다.
+            // 규칙은 BattleReward 한 곳에 있다 — 전투터 씬도 같은 것을 부른다.
             var battleResult = BattleHandoff.TakeResult();
             if (state != null && battleResult != null)
             {
-                message = ApplyBattleResult(state, battleResult);
+                message = BattleReward.Apply(state, battleResult);
             }
 
             if (state == null)
@@ -83,33 +84,6 @@ namespace FarmCreature.Presentation
                 {
                     farmBuildings[i].Bind(hud);
                 }
-            }
-        }
-
-        /// <summary>
-        /// 전투 보상을 지급한다. <b>재화가 들어오는 지점은 여기 하나뿐이다</b> —
-        /// 전투 씬은 액수만 실어 보낸다. 씬이 중간에 바뀌어도 이중 지급이 없다 (설계 3.3).
-        /// </summary>
-        private static string ApplyBattleResult(GameState state, BattleResult result)
-        {
-            switch (result.Conclusion)
-            {
-                case BattleConclusion.Victory:
-                    state.AddGold(result.GoldReward);
-
-                    // 진행도가 기록되는 지점도 여기 하나뿐이다 (설계 3.3) — 재화와 같은 자리다.
-                    // 빈 id 는 StageProgress 가 알아서 무시한다. 연습 전투가 그 경우다.
-                    bool firstClear = state.Progress.MarkCleared(result.StageId);
-
-                    return firstClear
-                        ? "승리했다! 재화 " + result.GoldReward + " 획득. 새 길이 열렸다."
-                        : "승리했다! 재화 " + result.GoldReward + " 획득.";
-
-                case BattleConclusion.Defeat:
-                    return "패배했다. 케어는 다치지 않는다 — 더 키워서 다시 오자.";
-
-                default:
-                    return "전투에서 물러났다.";
             }
         }
 

@@ -30,6 +30,10 @@ namespace FarmCreature.EditorTools
         private const string FarmScenePath = ScenesDir + "/FarmScene.unity";
         private const string BattleScenePath = ScenesDir + "/BattleScene.unity";
         private const string BarnScenePath = ScenesDir + "/BarnScene.unity";
+        private const string HatcheryScenePath = ScenesDir + "/HatcheryScene.unity";
+        private const string StorageScenePath = ScenesDir + "/StorageScene.unity";
+        private const string ShopScenePath = ScenesDir + "/ShopScene.unity";
+        private const string BattleGroundScenePath = ScenesDir + "/BattleGroundScene.unity";
 
         // 씬에 직렬화되려면 스프라이트가 '에셋'이어야 한다.
         // 코드로 만든 런타임 Sprite 는 저장되지 않아 씬을 다시 열면 전부 사라진다.
@@ -67,17 +71,17 @@ namespace FarmCreature.EditorTools
             var speciesDb = BuildSpeciesDatabase(species);
             var itemDb = BuildItemDatabase(items);
             BuildEnemyDatabase(enemies);
-            var stageDb = BuildBattleDataAssets(enemies);
+            BuildBattleDataAssets(enemies);
 
-            var eggs = BuildEggAssets(species);
-            var eggDb = BuildEggDatabase(eggs);
-            var shopStock = BuildShopStock();
+            // 아래 데이터베이스들은 농장이 아니라 각 건물 씬이 쓴다. 그 씬을 채울 때
+            // 경로에서 다시 로드하므로(NextScene 주석) 여기서는 만들어 두기만 한다.
+            BuildEggDatabase(BuildEggAssets(species));
+            BuildShopStock();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            BuildFarmScene(farmScene, speciesDb, itemDb, stageDb, eggDb, shopStock,
-                species["sprigling"], items);
+            BuildFarmScene(farmScene, speciesDb, itemDb, species["sprigling"], items);
 
             // ★ 두 번째 NewScene 이 위에서 얻은 참조를 '다시' 죽인다 (함정 3.9와 같은 원리).
             // 그래서 전투 씬을 채우기 전에 필요한 것을 경로에서 전부 다시 로드한다.
@@ -99,34 +103,28 @@ namespace FarmCreature.EditorTools
 
             BuildBattleScene(battleScene, battleMap, practiceEncounter, practiceSpecies);
 
-            // ★ 세 번째 NewScene. 위와 같은 이유로 참조를 다시 로드해야 한다 (함정 3.9 / 3.10).
-            var barnScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            // ★ 여기서부터 건물 씬 5개. NewScene 을 부를 때마다 이전에 얻은 에셋 참조가
+            // 죽으므로, 씬을 채우기 직전에 매번 경로에서 다시 로드한다 (함정 3.9 / 3.10).
+            // 이 재로드를 빠뜨리면 조각이 빠진 씬이 종료 코드 0 으로 조용히 저장된다.
+            BuildBarnScene(NextScene());
+            BuildHatcheryScene(NextScene());
+            BuildStorageScene(NextScene());
+            BuildShopScene(NextScene());
+            BuildBattleGroundScene(NextScene());
 
-            ReloadSpriteAssets();
-            var barnSpeciesDb = AssetDatabase.LoadAssetAtPath<SpeciesDatabase>(
-                DataRoot + "/SpeciesDatabase.asset");
-            var barnItemDb = AssetDatabase.LoadAssetAtPath<ItemDatabase>(
-                DataRoot + "/ItemDatabase.asset");
-
-            if (barnSpeciesDb == null || barnItemDb == null)
-            {
-                Debug.LogError("[FarmCreature] 헛간 씬용 에셋 재로드 실패 — "
-                    + "speciesDb==null? " + (barnSpeciesDb == null)
-                    + " itemDb==null? " + (barnItemDb == null));
-            }
-
-            BuildBarnScene(barnScene, barnSpeciesDb, barnItemDb);
-
-            // 세 씬을 모두 등록한다. 안 하면 LoadScene 이 런타임에 실패한다 (설계 5.1).
+            // 일곱 씬을 모두 등록한다. 안 하면 LoadScene 이 런타임에 실패한다 (설계 5.1).
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(FarmScenePath, true),
                 new EditorBuildSettingsScene(BattleScenePath, true),
-                new EditorBuildSettingsScene(BarnScenePath, true)
+                new EditorBuildSettingsScene(BarnScenePath, true),
+                new EditorBuildSettingsScene(HatcheryScenePath, true),
+                new EditorBuildSettingsScene(StorageScenePath, true),
+                new EditorBuildSettingsScene(ShopScenePath, true),
+                new EditorBuildSettingsScene(BattleGroundScenePath, true)
             };
 
-            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬 3개를 생성했습니다: "
-                + FarmScenePath + " / " + BattleScenePath + " / " + BarnScenePath);
+            Debug.Log("[FarmCreature] Build All 완료 — 에셋과 씬 7개를 생성했습니다.");
         }
 
         /// <summary>
@@ -687,9 +685,6 @@ namespace FarmCreature.EditorTools
             UnityEngine.SceneManagement.Scene scene,
             SpeciesDatabase speciesDb,
             ItemDatabase itemDb,
-            StageMapDatabase stageDb,
-            EggDatabase eggDb,
-            ShopStockDatabase shopStock,
             CreatureSpeciesData startingSpecies,
             List<ItemData> items)
         {
@@ -807,56 +802,19 @@ namespace FarmCreature.EditorTools
             var careManager = careGo.AddComponent<CareManager>();
             careManager.itemDatabase = itemDb;
 
-            // 패널 — Canvas 하위에 둬야 UiFontApplier 가 한글 폰트를 꽂아준다.
-            // PanelRoot 자체는 활성이고 패널만 비활성이다 (부모가 꺼져 있으면 Open 해도 안 보인다).
-            var panelRoot = new GameObject("PanelRoot", typeof(RectTransform));
-            panelRoot.transform.SetParent(canvasGo.transform, false);
-            StretchFull(panelRoot.GetComponent<RectTransform>());
-
-            // 헛간과 육성은 여기 없다 — 헛간 씬으로 옮겨갔다.
-            var storagePanel = BuildStoragePanel(panelRoot.transform, careManager, itemDb);
-            var battlePanel = BuildBattlePanel(panelRoot.transform, careManager, stageDb, itemDb);
-            var shopPanel = BuildShopPanel(panelRoot.transform, careManager, shopStock, eggDb);
-            var hatchPanel = BuildHatchPanel(panelRoot.transform, careManager, eggDb);
-
-            careManager.panels = new List<GamePanel>
-            {
-                storagePanel, battlePanel, shopPanel, hatchPanel
-            };
+            // ★ 농장에는 패널이 하나도 없다. 다섯 동이 전부 자기 씬을 갖는다.
+            // 농장은 이제 '건물이 서 있는 바깥'이고 조작은 전부 안에서 한다.
+            careManager.panels = new List<GamePanel>();
             careManager.raisingPanel = null;   // 육성은 헛간 씬 안에 있다
             careManager.partyField = partyField;
 
-            // 건물 → 패널 또는 씬. 헛간만 씬으로 들어가고 나머지 넷은 아직 패널을 연다.
-            // 둘이 공존하는 것은 의도된 중간 상태다 — 건물이 하나씩 씬으로 옮겨간다.
+            // 건물 → 씬. 클릭하면 상태를 들려 보내고 그 씬으로 들어간다.
             for (int i = 0; i < buildings.Count; i++)
             {
                 buildings[i].careManager = careManager;
-
-                switch (buildings[i].kind)
-                {
-                    case BuildingKind.Barn:
-                        buildings[i].sceneName = BarnSceneRoot.SceneName;
-                        break;
-                    case BuildingKind.Hatchery:
-                        buildings[i].panel = hatchPanel;
-                        break;
-                    case BuildingKind.Storage:
-                        buildings[i].panel = storagePanel;
-                        break;
-                    case BuildingKind.Shop:
-                        buildings[i].panel = shopPanel;
-                        break;
-                    case BuildingKind.BattleGround:
-                        buildings[i].panel = battlePanel;
-                        break;
-                }
+                buildings[i].panel = null;
+                buildings[i].sceneName = SceneNameOf(buildings[i].kind);
             }
-
-            // 배선이 전부 끝난 뒤에 닫는다. 켜 둔 채로 저장하면 시작하자마자 패널이 떠 있다.
-            storagePanel.gameObject.SetActive(false);
-            battlePanel.gameObject.SetActive(false);
-            shopPanel.gameObject.SetActive(false);
-            hatchPanel.gameObject.SetActive(false);
 
             // 루트 조립
             var rootGo = new GameObject("GameRoot");
@@ -1002,30 +960,61 @@ namespace FarmCreature.EditorTools
             EditorSceneManager.SaveScene(scene, BattleScenePath);
         }
 
-        /// <summary>
-        /// 헛간 안 씬. 왼쪽은 헛간지기와 파티, 오른쪽은 보관함 격자다.
-        ///
-        /// <b>방 화면은 열린 채로 저장한다</b> — 씬의 본체라서 닫아 두면 빈 방이 뜬다.
-        /// 함정 3.8("패널은 닫아 저장")은 팝업 규칙이고, 여기서는 육성 팝업만 그것을 따른다.
-        ///
-        /// <b>방과 팝업의 부모를 나눈 이유</b>: <see cref="GamePanel.Open"/> 은 <b>형제 패널을 닫는다.</b>
-        /// 한 부모에 두면 [육성]을 누르는 순간 방 화면이 통째로 꺼진다.
-        ///
-        /// 칸은 <see cref="Roster.MaxMembers"/> 개, 파티 줄은 <see cref="Roster.MaxParty"/> 개를
-        /// 씬 생성 시점에 고정한다 (함정 3.1).
-        /// </summary>
-        private static void BuildBarnScene(
-            UnityEngine.SceneManagement.Scene scene,
-            SpeciesDatabase speciesDb,
-            ItemDatabase itemDb)
+        // ---------- 건물 씬 공통 ----------
+
+        /// <summary>건물 씬 하나가 되는 조각들. <see cref="BuildBuildingShell"/> 이 돌려준다.</summary>
+        private class BuildingScenePieces
         {
-            // 카메라 — 방 안은 팬하지 않는다. UI 만 있으므로 배경색만 정한다.
+            public GameObject Canvas;
+            public Transform RoomRoot;
+            public Transform PopupRoot;
+            public CareManager Care;
+            public GameHud Hud;
+        }
+
+        /// <summary>
+        /// 빈 씬을 열고 스프라이트 참조를 되살린다. <b>건물 씬마다 부른다.</b>
+        ///
+        /// <c>NewScene</c> 은 참조되지 않는 에셋을 언로드하면서 그 전에 얻어 둔 참조의
+        /// 네이티브 객체를 파괴한다 (함정 3.9). 씬이 늘어날수록 이 함정을 밟을 자리도 늘어나므로,
+        /// "씬을 여는 것과 참조를 되살리는 것"을 한 함수로 묶어 빠뜨릴 수 없게 했다.
+        /// </summary>
+        private static UnityEngine.SceneManagement.Scene NextScene()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            ReloadSpriteAssets();
+            return scene;
+        }
+
+        /// <summary>경로에서 다시 로드한다. 없으면 크게 실패시킨다 — 0 은 정상 상황이 아니다.</summary>
+        private static T RequireAsset<T>(string assetPath) where T : Object
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+
+            if (asset == null)
+            {
+                Debug.LogError("[FarmCreature] 에셋 재로드 실패 — NewScene 이후 참조가 죽었다: "
+                               + assetPath);
+            }
+
+            return asset;
+        }
+
+        /// <summary>
+        /// 건물 씬의 공통 뼈대 — 카메라 · Canvas · EventSystem · 방/팝업 루트 · 조율자 · HUD.
+        ///
+        /// <b>방과 팝업의 부모를 나눈다.</b> <see cref="GamePanel.Open"/> 이 형제 패널을 닫으므로
+        /// 한 부모에 두면 팝업을 여는 순간 방 화면이 통째로 꺼진다 (함정 3.13).
+        /// 팝업이 없는 건물도 루트는 만들어 둔다 — 나중에 하나 붙일 때 이 함정을 다시 밟지 않게.
+        /// </summary>
+        private static BuildingScenePieces BuildBuildingShell(Color background, ItemDatabase itemDb)
+        {
             var cameraGo = new GameObject("Main Camera");
             cameraGo.tag = "MainCamera";
             var camera = cameraGo.AddComponent<Camera>();
             camera.orthographic = true;
             camera.orthographicSize = 5.4f;
-            camera.backgroundColor = new Color(0.16f, 0.12f, 0.1f);
+            camera.backgroundColor = background;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.transform.position = new Vector3(0f, 0f, -10f);
 
@@ -1050,17 +1039,10 @@ namespace FarmCreature.EditorTools
             StretchFull(popupRoot.GetComponent<RectTransform>());
 
             var careGo = new GameObject("CareManager");
-            var careManager = careGo.AddComponent<CareManager>();
-            careManager.itemDatabase = itemDb;
+            var care = careGo.AddComponent<CareManager>();
+            care.itemDatabase = itemDb;
+            care.partyField = null;   // 필드는 농장에만 있다
 
-            var roomPanel = BuildBarnRoomPanel(roomRoot.transform, careManager);
-            var raisingPanel = BuildRaisingPanel(popupRoot.transform, careManager);
-
-            careManager.panels = new List<GamePanel> { roomPanel, raisingPanel };
-            careManager.raisingPanel = raisingPanel;
-            careManager.partyField = null;   // 필드는 농장에만 있다
-
-            // HUD — 방이 케어 상세를 직접 보여주므로 상태창은 재화·머릿수만 맡는다.
             var statusText = CreateText(canvasGo.transform, "StatusText",
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f),
                 new Vector2(420f, 200f), TextAnchor.UpperLeft, 24);
@@ -1077,16 +1059,249 @@ namespace FarmCreature.EditorTools
             hud.statusText = statusText;
             hud.logText = logText;
 
+            return new BuildingScenePieces
+            {
+                Canvas = canvasGo,
+                RoomRoot = roomRoot.transform,
+                PopupRoot = popupRoot.transform,
+                Care = care,
+                Hud = hud
+            };
+        }
+
+        /// <summary>
+        /// 방 뒤에 깔리는 바닥. 건물마다 색만 다르다 — 실제 내부 그림이 들어올 자리다.
+        /// </summary>
+        private static void BuildRoomFloor(Transform roomRoot, Color color, string title)
+        {
+            var floorGo = new GameObject("RoomFloor", typeof(RectTransform), typeof(Image));
+            floorGo.transform.SetParent(roomRoot, false);
+            StretchFull(floorGo.GetComponent<RectTransform>());
+
+            var image = floorGo.GetComponent<Image>();
+            image.sprite = squareSprite;
+            image.color = color;
+
+            // 바닥이 패널보다 뒤에 있어야 한다. 먼저 만들었으므로 형제 순서상 이미 뒤다.
+            floorGo.transform.SetAsFirstSibling();
+
+            var titleText = CreatePanelText(roomRoot, "RoomTitle", new Vector2(0f, 470f),
+                new Vector2(900f, 60f), TextAnchor.MiddleCenter, 40, new Color(0.95f, 0.92f, 0.84f));
+            titleText.text = title;
+        }
+
+        /// <summary>
+        /// 패널의 [닫기] 를 [농장으로] 로 바꾼다.
+        ///
+        /// 패널이 씬의 본체가 되면서 <b>닫는다는 개념이 없어졌다</b> — 닫으면 빈 방만 남는다.
+        /// 버튼 이름도 <c>ExitToFarm</c> 으로 바꾼다. 무결성 검사가 이 이름으로 나가는 길을 찾는다.
+        /// </summary>
+        private static void RewireCloseToExit(Transform panel, BuildingSceneRoot root)
+        {
+            var close = panel.Find("Close");
+
+            if (close == null)
+            {
+                Debug.LogError("[FarmCreature] " + panel.name
+                               + " 에 Close 버튼이 없어 나가는 길을 만들지 못했다");
+                return;
+            }
+
+            var button = close.GetComponent<Button>();
+
+            // 기존 Close 리스너를 먼저 지운다. 남겨두면 누를 때 방이 꺼지고 씬도 바뀐다.
+            while (button.onClick.GetPersistentEventCount() > 0)
+            {
+                UnityEventTools.RemovePersistentListener(button.onClick, 0);
+            }
+
+            UnityEventTools.AddVoidPersistentListener(
+                button.onClick, new UnityAction(root.ExitToFarm));
+
+            var label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.text = "농장으로";
+            }
+
+            close.name = "ExitToFarm";
+        }
+
+        /// <summary>배선을 끝낸 뒤 씬을 저장한다.</summary>
+        private static void SaveScene(UnityEngine.SceneManagement.Scene scene, string path)
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, path);
+        }
+
+        /// <summary>건물 종류 → 그 건물의 씬 이름. 농장의 진입 배선이 이것을 쓴다.</summary>
+        private static string SceneNameOf(BuildingKind kind)
+        {
+            switch (kind)
+            {
+                case BuildingKind.Barn:
+                    return BarnSceneRoot.SceneName;
+                case BuildingKind.Hatchery:
+                    return HatcherySceneRoot.SceneName;
+                case BuildingKind.Storage:
+                    return StorageSceneRoot.SceneName;
+                case BuildingKind.Shop:
+                    return ShopSceneRoot.SceneName;
+                case BuildingKind.BattleGround:
+                    return BattleGroundSceneRoot.SceneName;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        // ---------- 건물 씬 넷 (기존 패널이 그대로 옮겨온다) ----------
+
+        private static void BuildHatcheryScene(UnityEngine.SceneManagement.Scene scene)
+        {
+            var speciesDb = RequireAsset<SpeciesDatabase>(DataRoot + "/SpeciesDatabase.asset");
+            var itemDb = RequireAsset<ItemDatabase>(DataRoot + "/ItemDatabase.asset");
+            var eggDb = RequireAsset<EggDatabase>(DataRoot + "/EggDatabase.asset");
+
+            var pieces = BuildBuildingShell(new Color(0.2f, 0.18f, 0.12f), itemDb);
+            BuildRoomFloor(pieces.RoomRoot, new Color(0.3f, 0.27f, 0.16f, 1f), "부화소");
+
+            var panel = BuildHatchPanel(pieces.RoomRoot, pieces.Care, eggDb);
+
+            var root = new GameObject("HatcherySceneRoot").AddComponent<HatcherySceneRoot>();
+            root.speciesDatabase = speciesDb;
+            root.itemDatabase = itemDb;
+            root.careManager = pieces.Care;
+            root.hud = pieces.Hud;
+            root.roomPanel = panel;
+
+            pieces.Care.panels = new List<GamePanel> { panel };
+
+            RewireCloseToExit(panel.transform, root);
+            panel.gameObject.SetActive(true);
+
+            SaveScene(scene, HatcheryScenePath);
+        }
+
+        private static void BuildStorageScene(UnityEngine.SceneManagement.Scene scene)
+        {
+            var speciesDb = RequireAsset<SpeciesDatabase>(DataRoot + "/SpeciesDatabase.asset");
+            var itemDb = RequireAsset<ItemDatabase>(DataRoot + "/ItemDatabase.asset");
+
+            var pieces = BuildBuildingShell(new Color(0.16f, 0.14f, 0.11f), itemDb);
+            BuildRoomFloor(pieces.RoomRoot, new Color(0.28f, 0.23f, 0.16f, 1f), "창고");
+
+            var panel = BuildStoragePanel(pieces.RoomRoot, pieces.Care, itemDb);
+
+            var root = new GameObject("StorageSceneRoot").AddComponent<StorageSceneRoot>();
+            root.speciesDatabase = speciesDb;
+            root.itemDatabase = itemDb;
+            root.careManager = pieces.Care;
+            root.hud = pieces.Hud;
+            root.roomPanel = panel;
+
+            pieces.Care.panels = new List<GamePanel> { panel };
+
+            RewireCloseToExit(panel.transform, root);
+            panel.gameObject.SetActive(true);
+
+            SaveScene(scene, StorageScenePath);
+        }
+
+        private static void BuildShopScene(UnityEngine.SceneManagement.Scene scene)
+        {
+            var speciesDb = RequireAsset<SpeciesDatabase>(DataRoot + "/SpeciesDatabase.asset");
+            var itemDb = RequireAsset<ItemDatabase>(DataRoot + "/ItemDatabase.asset");
+            var eggDb = RequireAsset<EggDatabase>(DataRoot + "/EggDatabase.asset");
+            var shopStock = RequireAsset<ShopStockDatabase>(DataRoot + "/ShopStockDatabase.asset");
+
+            var pieces = BuildBuildingShell(new Color(0.12f, 0.15f, 0.2f), itemDb);
+            BuildRoomFloor(pieces.RoomRoot, new Color(0.2f, 0.26f, 0.34f, 1f), "상점");
+
+            var panel = BuildShopPanel(pieces.RoomRoot, pieces.Care, shopStock, eggDb);
+
+            var root = new GameObject("ShopSceneRoot").AddComponent<ShopSceneRoot>();
+            root.speciesDatabase = speciesDb;
+            root.itemDatabase = itemDb;
+            root.careManager = pieces.Care;
+            root.hud = pieces.Hud;
+            root.roomPanel = panel;
+
+            pieces.Care.panels = new List<GamePanel> { panel };
+
+            RewireCloseToExit(panel.transform, root);
+            panel.gameObject.SetActive(true);
+
+            SaveScene(scene, ShopScenePath);
+        }
+
+        /// <summary>
+        /// 전투터 씬. 다른 건물과 다른 점 하나 — 여기서 <b>또 다른 씬(전투)으로</b> 나갔다 돌아온다.
+        /// <see cref="BattlePanel.battleReturnScene"/> 에 자기 씬 이름을 적어,
+        /// 전투가 끝나면 농장이 아니라 여기로 돌아오게 한다.
+        /// </summary>
+        private static void BuildBattleGroundScene(UnityEngine.SceneManagement.Scene scene)
+        {
+            var speciesDb = RequireAsset<SpeciesDatabase>(DataRoot + "/SpeciesDatabase.asset");
+            var itemDb = RequireAsset<ItemDatabase>(DataRoot + "/ItemDatabase.asset");
+            var stageDb = RequireAsset<StageMapDatabase>(DataRoot + "/StageMapDatabase.asset");
+
+            var pieces = BuildBuildingShell(new Color(0.18f, 0.11f, 0.11f), itemDb);
+            BuildRoomFloor(pieces.RoomRoot, new Color(0.3f, 0.18f, 0.17f, 1f), "전투터");
+
+            var panel = BuildBattlePanel(pieces.RoomRoot, pieces.Care, stageDb, itemDb);
+            panel.battleReturnScene = BattleGroundSceneRoot.SceneName;
+
+            var root = new GameObject("BattleGroundSceneRoot").AddComponent<BattleGroundSceneRoot>();
+            root.speciesDatabase = speciesDb;
+            root.itemDatabase = itemDb;
+            root.careManager = pieces.Care;
+            root.hud = pieces.Hud;
+            root.roomPanel = panel;
+
+            pieces.Care.panels = new List<GamePanel> { panel };
+
+            RewireCloseToExit(panel.transform, root);
+            panel.gameObject.SetActive(true);
+
+            SaveScene(scene, BattleGroundScenePath);
+        }
+
+        /// <summary>
+        /// 헛간 안 씬. 왼쪽은 헛간지기와 파티, 오른쪽은 보관함 격자다.
+        ///
+        /// <b>방 화면은 열린 채로 저장한다</b> — 씬의 본체라서 닫아 두면 빈 방이 뜬다.
+        /// 함정 3.8("패널은 닫아 저장")은 팝업 규칙이고, 여기서는 육성 팝업만 그것을 따른다.
+        ///
+        /// <b>방과 팝업의 부모를 나눈 이유</b>: <see cref="GamePanel.Open"/> 은 <b>형제 패널을 닫는다.</b>
+        /// 한 부모에 두면 [육성]을 누르는 순간 방 화면이 통째로 꺼진다.
+        ///
+        /// 칸은 <see cref="Roster.MaxMembers"/> 개, 파티 줄은 <see cref="Roster.MaxParty"/> 개를
+        /// 씬 생성 시점에 고정한다 (함정 3.1).
+        /// </summary>
+        private static void BuildBarnScene(UnityEngine.SceneManagement.Scene scene)
+        {
+            var speciesDb = RequireAsset<SpeciesDatabase>(DataRoot + "/SpeciesDatabase.asset");
+            var itemDb = RequireAsset<ItemDatabase>(DataRoot + "/ItemDatabase.asset");
+
+            // 헛간은 방 화면이 자기 배경을 갖고 있어 RoomFloor 를 깔지 않는다.
+            var pieces = BuildBuildingShell(new Color(0.16f, 0.12f, 0.1f), itemDb);
+
+            var roomPanel = BuildBarnRoomPanel(pieces.RoomRoot, pieces.Care);
+            var raisingPanel = BuildRaisingPanel(pieces.PopupRoot, pieces.Care);
+
+            pieces.Care.panels = new List<GamePanel> { roomPanel, raisingPanel };
+            pieces.Care.raisingPanel = raisingPanel;
+
             var rootGo = new GameObject("BarnSceneRoot");
             var root = rootGo.AddComponent<BarnSceneRoot>();
             root.speciesDatabase = speciesDb;
             root.itemDatabase = itemDb;
-            root.careManager = careManager;
-            root.hud = hud;
+            root.careManager = pieces.Care;
+            root.hud = pieces.Hud;
             root.roomPanel = roomPanel;
 
             // [나가기] 는 방이 아니라 루트의 일이다 — 왕복 규칙이 BuildingSceneRoot 에 있다.
-            var exitButton = CreatePanelButton(roomRoot.transform, "ExitToFarm", "농장으로",
+            var exitButton = CreatePanelButton(pieces.RoomRoot, "ExitToFarm", "농장으로",
                 new Vector2(690f, -260f), new Vector2(220f, 64f), new Color(0.6f, 0.42f, 0.32f));
             UnityEventTools.AddVoidPersistentListener(
                 exitButton.onClick, new UnityAction(root.ExitToFarm));
@@ -1095,8 +1310,7 @@ namespace FarmCreature.EditorTools
             roomPanel.gameObject.SetActive(true);
             raisingPanel.gameObject.SetActive(false);
 
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene, BarnScenePath);
+            SaveScene(scene, BarnScenePath);
         }
 
         /// <summary>

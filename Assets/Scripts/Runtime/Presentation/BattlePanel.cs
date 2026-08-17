@@ -36,6 +36,9 @@ namespace FarmCreature.Presentation
         [Tooltip("로그를 맡길 조율자. GameBootstrap 이 채운다.")]
         public CareManager careManager;
 
+        [Tooltip("전투가 끝나면 돌아올 씬. 비우면 농장으로 간다. GameBootstrap 이 채운다.")]
+        public string battleReturnScene;
+
         /// <summary>−1 이면 맵 목록을 보고 있다. 0 이상이면 그 맵의 스테이지 목록이다.</summary>
         private int openMapIndex = -1;
 
@@ -221,7 +224,9 @@ namespace FarmCreature.Presentation
                 return;
             }
 
-            BattleHandoff.SetRequest(state, map.Get(index), map.field);
+            // 들어온 곳으로 돌아오게 한다 — 전투터가 씬이 되면서 농장을 거치지 않고
+            // 다음 스테이지를 고를 수 있어야 한다.
+            BattleHandoff.SetRequest(state, map.Get(index), map.field, battleReturnScene);
             SceneManager.LoadScene(BattleSceneName);
         }
 
