@@ -40,7 +40,10 @@ namespace FarmCreature.Presentation
             var battleResult = BattleHandoff.TakeResult();
             if (state != null && battleResult != null)
             {
-                message = BattleReward.Apply(state, battleResult);
+                // HUD 가 이름 데이터베이스를 들고 있다 — 드랍을 id 가 아니라 이름으로 적는다.
+                message = BattleReward.Apply(state, battleResult,
+                    hud != null ? hud.itemDatabase : null,
+                    hud != null ? hud.eggDatabase : null);
             }
 
             if (state == null)

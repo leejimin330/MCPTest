@@ -35,29 +35,8 @@ namespace FarmCreature.Presentation
         public static string InventoryLine(
             string itemId, int count, ItemDatabase items, EggDatabase eggs)
         {
-            return InventoryName(itemId, items, eggs) + " x" + count;
-        }
-
-        private static string InventoryName(string itemId, ItemDatabase items, EggDatabase eggs)
-        {
-            if (string.IsNullOrEmpty(itemId))
-            {
-                return "???";
-            }
-
-            var item = items != null ? items.Find(itemId) : null;
-            if (item != null && !string.IsNullOrEmpty(item.displayName))
-            {
-                return item.displayName;
-            }
-
-            var egg = eggs != null ? eggs.Find(itemId) : null;
-            if (egg != null && !string.IsNullOrEmpty(egg.displayName))
-            {
-                return egg.displayName;
-            }
-
-            return itemId;
+            // 이름 찾기 규칙은 Core 의 ItemNames 한 곳에 있다 — 전투 보상 로그도 같은 것을 쓴다.
+            return ItemNames.Of(itemId, items, eggs) + " x" + count;
         }
 
         // ---------- 창고 ----------

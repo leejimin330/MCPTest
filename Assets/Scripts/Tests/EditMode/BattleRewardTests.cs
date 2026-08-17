@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using FarmCreature.Core;
+using FarmCreature.Data;
 using NUnit.Framework;
 
 namespace FarmCreature.Tests
@@ -19,14 +21,21 @@ namespace FarmCreature.Tests
             return new GameState(roster, new Inventory(), gold);
         }
 
-        private static BattleResult Result(BattleConclusion conclusion, int gold, string stageId)
+        private static BattleResult Result(
+            BattleConclusion conclusion, int gold, string stageId, params DropAward[] drops)
         {
             return new BattleResult
             {
                 Conclusion = conclusion,
                 GoldReward = gold,
-                StageId = stageId
+                StageId = stageId,
+                Drops = drops.Length == 0 ? null : new List<DropAward>(drops)
             };
+        }
+
+        private static DropAward Award(string itemId, int count)
+        {
+            return new DropAward { ItemId = itemId, Count = count };
         }
 
         [Test]
@@ -102,6 +111,70 @@ namespace FarmCreature.Tests
         public void NullState_IsIgnored()
         {
             Assert.IsNull(BattleReward.Apply(null, Result(BattleConclusion.Victory, 10, "field_1")));
+        }
+
+        // ---- 드랍 ----
+
+        [Test]
+        public void Victory_PutsDropsIntoTheInventory()
+        {
+            // 드랍이 들어가는 지점도 여기 하나뿐이다 — 전투 씬은 굴려진 결과만 실어 보낸다.
+            var state = MakeState(0);
+
+            BattleReward.Apply(state, Result(BattleConclusion.Victory, 5, "field_1",
+                Award("bloom_stone", 2), Award("egg_sprigling", 1)));
+
+            Assert.AreEqual(2, state.Inventory.GetCount("bloom_stone"));
+            Assert.AreEqual(1, state.Inventory.GetCount("egg_sprigling"));
+        }
+
+        [Test]
+        public void Victory_MentionsTheDropsByName()
+        {
+            var state = MakeState(0);
+            var items = TestFixtures.MakeItemDatabase(
+                TestFixtures.MakeItem("bloom_stone", StatType.Health, 5, "블룸 스톤"));
+
+            string message = BattleReward.Apply(
+                state, Result(BattleConclusion.Victory, 5, "field_1", Award("bloom_stone", 1)),
+                items, null);
+
+            StringAssert.Contains("블룸 스톤", message);
+            StringAssert.DoesNotContain("bloom_stone", message, "로그에 id 가 그대로 나왔다");
+        }
+
+        [Test]
+        public void Victory_WithoutDrops_SaysNothingAboutThem()
+        {
+            var state = MakeState(0);
+
+            string message = BattleReward.Apply(state, Result(BattleConclusion.Victory, 5, "field_1"));
+
+            StringAssert.DoesNotContain("얻었다", message);
+        }
+
+        [Test]
+        public void Defeat_GivesNoDropsEvenIfSomeAreAttached()
+        {
+            // 재화와 같은 규칙이다 — 지면 아무것도 안 준다.
+            var state = MakeState(0);
+
+            BattleReward.Apply(state, Result(BattleConclusion.Defeat, 10, "field_1",
+                Award("bloom_stone", 1)));
+
+            Assert.AreEqual(0, state.Inventory.GetCount("bloom_stone"));
+        }
+
+        [Test]
+        public void BrokenAwards_AreIgnored()
+        {
+            var state = MakeState(0);
+
+            string message = BattleReward.Apply(state, Result(BattleConclusion.Victory, 5, "field_1",
+                Award(null, 1), Award("ok", 0)));
+
+            Assert.AreEqual(0, state.Inventory.GetCount("ok"));
+            StringAssert.DoesNotContain("얻었다", message);
         }
     }
 }

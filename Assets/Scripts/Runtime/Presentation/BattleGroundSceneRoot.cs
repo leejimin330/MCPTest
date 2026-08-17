@@ -36,7 +36,10 @@ namespace FarmCreature.Presentation
                 return;
             }
 
-            string message = BattleReward.Apply(state, result);
+            // HUD 가 이름 데이터베이스를 들고 있다 — 드랍을 id 가 아니라 이름으로 적는다.
+            string message = BattleReward.Apply(state, result,
+                hud != null ? hud.itemDatabase : null,
+                hud != null ? hud.eggDatabase : null);
 
             if (careManager != null)
             {

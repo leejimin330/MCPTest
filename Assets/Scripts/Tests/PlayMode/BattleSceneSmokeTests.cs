@@ -207,6 +207,35 @@ namespace FarmCreature.Tests
         }
 
         [UnityTest]
+        public IEnumerator Victory_CarriesAResolvedDropList()
+        {
+            // 드랍 규칙과 지급은 EditMode 가 덮는다. 여기서 지키는 것은 <b>배선</b>이다 —
+            // 전투 씬이 이겼을 때 실제로 굴려서 실어 보내는가. 안 실으면 증상이
+            // "드랍이 영원히 안 나온다" 뿐이라 확률 탓으로 오해하기 쉽다.
+            yield return LoadScene(BattleSceneName);
+
+            var root = FindRoot();
+            var state = MakeState(root.practiceSpecies, gold: 0);
+
+            BattleHandoff.SetRequest(state, root.practiceEncounter, null);
+            yield return LoadScene(BattleSceneName);
+            yield return RunUntil(() => BattleHandoff.HasResult);
+            Assert.IsTrue(BattleHandoff.HasResult, "전투가 끝나지 않았다");
+
+            var result = BattleHandoff.TakeResult();
+
+            if (result.Conclusion == BattleConclusion.Victory)
+            {
+                Assert.IsNotNull(result.Drops,
+                    "이겼는데 드랍 목록이 null 이다 — 전투 씬이 굴리지 않았다");
+            }
+            else
+            {
+                Assert.IsNull(result.Drops, "졌는데 드랍 목록이 실려 왔다 — 재화와 규칙이 다르다");
+            }
+        }
+
+        [UnityTest]
         public IEnumerator BattlePanel_RefusesToLeaveWithAnEmptyParty()
         {
             // 전투터는 8/17 에 농장에서 자기 씬으로 나갔다. 농장에는 이제 패널이 없다.

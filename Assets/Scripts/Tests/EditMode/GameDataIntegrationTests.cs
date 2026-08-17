@@ -52,6 +52,50 @@ namespace FarmCreature.Tests
         }
 
         [Test]
+        public void EveryEnemyDrop_PointsAtSomethingThatExists()
+        {
+            // ★ 드랍 id 를 오타 내면 인벤토리에 아무도 모르는 키가 쌓인다 — 이름도 안 나오고
+            // 쓸 수도 없고, 예외도 없다. 실제 에셋으로 대조하는 이 검사만 잡을 수 있다.
+            var enemyDb = AssetDatabase.LoadAssetAtPath<EnemyDatabase>(
+                "Assets/GameData/EnemyDatabase.asset");
+            Assert.IsNotNull(enemyDb, "EnemyDatabase 에셋이 없다. BuildAll 을 먼저 실행할 것.");
+
+            int checked_ = 0;
+
+            for (int i = 0; i < enemyDb.enemies.Count; i++)
+            {
+                var enemy = enemyDb.enemies[i];
+                Assert.IsNotNull(enemy, "EnemyDatabase 에 빈 칸이 있다");
+
+                if (enemy.drops == null)
+                {
+                    continue;
+                }
+
+                for (int d = 0; d < enemy.drops.Count; d++)
+                {
+                    var drop = enemy.drops[d];
+                    if (drop == null || string.IsNullOrEmpty(drop.itemId))
+                    {
+                        continue;
+                    }
+
+                    bool known = itemDb.Find(drop.itemId) != null || eggDb.Find(drop.itemId) != null;
+                    Assert.IsTrue(known,
+                        enemy.displayName + " 의 드랍 id '" + drop.itemId
+                        + "' 가 아이템에도 알에도 없다");
+
+                    Assert.Greater(drop.count, 0,
+                        enemy.displayName + " 의 드랍 개수가 0 이하다 — 아무것도 안 나온다");
+
+                    checked_++;
+                }
+            }
+
+            Assert.Greater(checked_, 0, "드랍 표가 하나도 안 깔렸다 — 씨앗이 들어가지 않았다");
+        }
+
+        [Test]
         public void ItemDatabase_ContainsAllThreeItems()
         {
             Assert.IsNotNull(itemDb.Find("hearty_feed"));

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FarmCreature.Data
@@ -23,6 +24,9 @@ namespace FarmCreature.Data
 
         [Tooltip("쓰러뜨렸을 때 주는 재화.")]
         public int goldReward = 10;
+
+        [Tooltip("쓰러뜨렸을 때 나올 수 있는 것들. 한 마리마다 따로 굴린다. 비어 있으면 아무것도 안 나온다.")]
+        public List<DropEntry> drops = new List<DropEntry>();
 
         public Color placeholderColor = new Color(0.8f, 0.35f, 0.35f);
     }

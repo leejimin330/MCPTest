@@ -19,4 +19,8 @@ MonoBehaviour:
   defense: 1
   attackInterval: 1.8
   goldReward: 8
+  drops:
+  - itemId: hearty_feed
+    chancePercent: 15
+    count: 1
   placeholderColor: {r: 0.72, g: 0.66, b: 0.55, a: 1}
