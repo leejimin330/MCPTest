@@ -12,6 +12,12 @@ namespace FarmCreature.Presentation
         public Text statusText;
         public Text logText;
 
+        [Tooltip("소지품을 id 가 아니라 표시 이름으로 적기 위해 필요하다. GameBootstrap 이 채운다.")]
+        public ItemDatabase itemDatabase;
+
+        [Tooltip("알도 같은 인벤토리에 담기므로 함께 봐야 한다. GameBootstrap 이 채운다.")]
+        public EggDatabase eggDatabase;
+
         private GameState state;
         private readonly StringBuilder builder = new StringBuilder();
 
@@ -63,7 +69,8 @@ namespace FarmCreature.Presentation
                 for (int i = 0; i < inventory.ItemIds.Count; i++)
                 {
                     string id = inventory.ItemIds[i];
-                    builder.AppendLine("  " + id + " x" + inventory.GetCount(id));
+                    builder.AppendLine("  " + PanelLabels.InventoryLine(
+                        id, inventory.GetCount(id), itemDatabase, eggDatabase));
                 }
             }
 

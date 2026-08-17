@@ -73,15 +73,16 @@ namespace FarmCreature.EditorTools
             BuildEnemyDatabase(enemies);
             BuildBattleDataAssets(enemies);
 
-            // 아래 데이터베이스들은 농장이 아니라 각 건물 씬이 쓴다. 그 씬을 채울 때
-            // 경로에서 다시 로드하므로(NextScene 주석) 여기서는 만들어 두기만 한다.
-            BuildEggDatabase(BuildEggAssets(species));
+            // 재고 목록은 상점 씬만 쓴다. 그 씬을 채울 때 경로에서 다시 로드하므로
+            // (NextScene 주석) 여기서는 만들어 두기만 한다.
+            // 알 목록은 농장의 HUD 도 쓴다 — 소지품 이름을 찾으려면 아이템과 알 양쪽을 봐야 한다.
+            var eggDb = BuildEggDatabase(BuildEggAssets(species));
             BuildShopStock();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            BuildFarmScene(farmScene, speciesDb, itemDb, species["sprigling"], items);
+            BuildFarmScene(farmScene, speciesDb, itemDb, eggDb, species["sprigling"], items);
 
             // ★ 두 번째 NewScene 이 위에서 얻은 참조를 '다시' 죽인다 (함정 3.9와 같은 원리).
             // 그래서 전투 씬을 채우기 전에 필요한 것을 경로에서 전부 다시 로드한다.
@@ -685,6 +686,7 @@ namespace FarmCreature.EditorTools
             UnityEngine.SceneManagement.Scene scene,
             SpeciesDatabase speciesDb,
             ItemDatabase itemDb,
+            EggDatabase eggDb,
             CreatureSpeciesData startingSpecies,
             List<ItemData> items)
         {
@@ -796,6 +798,8 @@ namespace FarmCreature.EditorTools
             var hud = hudGo.AddComponent<GameHud>();
             hud.statusText = statusText;
             hud.logText = logText;
+            hud.itemDatabase = itemDb;
+            hud.eggDatabase = eggDb;
 
             // 액션 조율자. 화면의 조작은 전부 패널을 거쳐 이 메서드들을 부른다.
             var careGo = new GameObject("CareManager");
@@ -1058,6 +1062,8 @@ namespace FarmCreature.EditorTools
             var hud = hudGo.AddComponent<GameHud>();
             hud.statusText = statusText;
             hud.logText = logText;
+            hud.itemDatabase = itemDb;
+            hud.eggDatabase = RequireAsset<EggDatabase>(DataRoot + "/EggDatabase.asset");
 
             return new BuildingScenePieces
             {
@@ -1332,27 +1338,31 @@ namespace FarmCreature.EditorTools
 
             // ---------- 왼쪽: 헛간지기와 파티 ----------
 
+            // 세로 배치는 위에서 아래로 겹치지 않게 손으로 맞췄다.
+            // 위쪽은 HUD 상태 표시(화면 왼쪽 위, 아래끝 y≈316)를 피해야 하고,
+            // 아래쪽은 파티 4줄이 화면(y=−540) 안에 들어와야 한다.
             var portraitGo = new GameObject("KeeperPortrait", typeof(RectTransform), typeof(Image));
             portraitGo.transform.SetParent(roomGo.transform, false);
             CenterRect(portraitGo.GetComponent<RectTransform>(),
-                new Vector2(-600f, 160f), new Vector2(300f, 300f));
+                new Vector2(-600f, 145f), new Vector2(270f, 270f));   // y 10 ~ 280
 
             var portrait = portraitGo.GetComponent<Image>();
             portrait.sprite = squareSprite;
             portrait.color = new Color(0.52f, 0.42f, 0.3f);   // 실제 그림이 들어올 자리
             panel.keeperPortrait = portrait;
 
+            // 초상 아래로 내려야 한다 — 예전에는 첫 줄("헛간지기")이 초상 안에 들어가 있었다.
             panel.keeperText = CreatePanelText(roomGo.transform, "KeeperText",
-                new Vector2(-600f, -60f), new Vector2(360f, 200f),
-                TextAnchor.UpperCenter, 24, new Color(0.9f, 0.86f, 0.74f));
+                new Vector2(-600f, -100f), new Vector2(360f, 180f),
+                TextAnchor.UpperCenter, 24, new Color(0.9f, 0.86f, 0.74f));   // y −190 ~ −10
 
             CreatePanelText(roomGo.transform, "PartyTitle",
-                new Vector2(-600f, -215f), new Vector2(360f, 40f),
+                new Vector2(-600f, -225f), new Vector2(360f, 40f),
                 TextAnchor.MiddleCenter, 26, new Color(0.75f, 0.85f, 0.7f))
                 .text = "밖에 나가 있는 케어";
 
             var partySlots = new Text[Roster.MaxParty];
-            float partyY = -270f;
+            float partyY = -285f;
 
             for (int i = 0; i < Roster.MaxParty; i++)
             {
@@ -1788,6 +1798,7 @@ namespace FarmCreature.EditorTools
                 new Vector2(1040f, 44f), TextAnchor.MiddleCenter, 24, new Color(0.85f, 0.85f, 0.7f));
 
             var rows = new Text[BattlePanel.RowsPerPage];
+            var rowButtons = new GameObject[BattlePanel.RowsPerPage];
             float rowY = 175f;
 
             for (int i = 0; i < BattlePanel.RowsPerPage; i++)
@@ -1801,10 +1812,15 @@ namespace FarmCreature.EditorTools
                 UnityEventTools.AddIntPersistentListener(
                     selectButton.onClick, new UnityAction<int>(panel.SelectRow), i);
 
+                // 빈 줄이면 패널이 런타임에 끈다. 오브젝트 자체는 6개 그대로 남으므로
+                // "고정 6칸" 검사는 여전히 통과한다.
+                rowButtons[i] = selectButton.gameObject;
+
                 rowY -= 70f;
             }
 
             panel.rowTexts = rows;
+            panel.rowButtons = rowButtons;
 
             var prevButton = CreatePanelButton(panelGo.transform, "PrevPage", "이전",
                 new Vector2(-330f, -290f), new Vector2(150f, 56f), new Color(0.4f, 0.45f, 0.55f));

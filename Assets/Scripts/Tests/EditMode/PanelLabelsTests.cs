@@ -21,6 +21,45 @@ namespace FarmCreature.Tests
             claw = TestFixtures.MakeItem("claw", StatType.Attack, 3, "무쇠 발톱");
         }
 
+        // ---- 소지품 (좌상단 상태 표시) ----
+
+        [Test]
+        public void InventoryLine_UsesTheDisplayNameNotTheId()
+        {
+            // id 는 표시 이름과 어긋나 있다(claw ↔ 무쇠 발톱). 실제로 화면에 id 가
+            // 그대로 나오고 있었고, 검사도 테스트도 잡지 못했다.
+            var items = TestFixtures.MakeItemDatabase(claw);
+
+            string line = PanelLabels.InventoryLine("claw", 3, items, null);
+
+            StringAssert.Contains("무쇠 발톱", line);
+            StringAssert.Contains("x3", line);
+            StringAssert.DoesNotContain("claw", line);
+        }
+
+        [Test]
+        public void InventoryLine_FindsEggsToo()
+        {
+            // 알과 아이템이 같은 인벤토리 키 공간을 쓰므로 두 계통을 다 봐야 한다.
+            var eggs = TestFixtures.MakeEggDatabase(
+                TestFixtures.MakeEgg("egg_sprigling", "스프리글링 알"));
+
+            string line = PanelLabels.InventoryLine("egg_sprigling", 1, null, eggs);
+
+            StringAssert.Contains("스프리글링 알", line);
+            StringAssert.DoesNotContain("egg_", line);
+        }
+
+        [Test]
+        public void InventoryLine_FallsBackToTheIdWhenNothingKnowsIt()
+        {
+            // 감추면 소지품이 조용히 사라져 "산 것이 어디 갔나" 가 된다.
+            string line = PanelLabels.InventoryLine("mystery", 2, null, null);
+
+            StringAssert.Contains("mystery", line);
+            StringAssert.Contains("x2", line);
+        }
+
         // ---- 창고 ----
 
         [Test]

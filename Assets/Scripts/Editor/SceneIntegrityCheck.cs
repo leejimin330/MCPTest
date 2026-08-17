@@ -333,6 +333,7 @@ namespace FarmCreature.EditorTools
             {
                 failures += RequireRef(report, "hud.statusText", hud.statusText);
                 failures += RequireRef(report, "hud.logText", hud.logText);
+                failures += RequireHudNamesItems(report, "농장", hud);
             }
 
             // 10. 카메라 팬
@@ -441,6 +442,7 @@ namespace FarmCreature.EditorTools
             else
             {
                 failures += RequireRef(report, label + " hud.logText", hud.logText);
+                failures += RequireHudNamesItems(report, label, hud);
             }
 
             if (Object.FindFirstObjectByType<Camera>(FindObjectsInactive.Include) == null)
@@ -449,6 +451,19 @@ namespace FarmCreature.EditorTools
                 failures++;
             }
 
+            return failures;
+        }
+
+        /// <summary>
+        /// HUD 가 소지품을 <b>id 가 아니라 표시 이름</b>으로 적을 수 있는가.
+        /// 배선이 빠지면 예외 없이 <c>hearty_feed x3</c> 처럼 id 가 그대로 화면에 나온다 —
+        /// 실제로 그 상태로 저장돼 있었고, 검사도 테스트도 잡지 못했다.
+        /// </summary>
+        private static int RequireHudNamesItems(StringBuilder report, string label, GameHud hud)
+        {
+            int failures = 0;
+            failures += RequireRef(report, label + " hud.itemDatabase", hud.itemDatabase);
+            failures += RequireRef(report, label + " hud.eggDatabase", hud.eggDatabase);
             return failures;
         }
 
@@ -607,6 +622,16 @@ namespace FarmCreature.EditorTools
             {
                 report.AppendLine("  [실패] battlePanel.rowTexts 가 "
                                   + BattlePanel.RowsPerPage + "개가 아님: " + battleRowTexts);
+                failures++;
+            }
+
+            // 빈 줄의 [선택]을 숨기려면 버튼 참조가 있어야 한다. 없으면 죽은 버튼이 떠 있다.
+            int battleRowButtons = battle.rowButtons == null ? 0 : battle.rowButtons.Length;
+            if (battleRowButtons != BattlePanel.RowsPerPage)
+            {
+                report.AppendLine("  [실패] battlePanel.rowButtons 가 "
+                                  + BattlePanel.RowsPerPage + "개가 아님: " + battleRowButtons
+                                  + " — 빈 줄에도 [선택] 버튼이 보인다");
                 failures++;
             }
 
@@ -885,6 +910,7 @@ namespace FarmCreature.EditorTools
             else
             {
                 failures += RequireRef(report, "헛간 hud.logText", hud.logText);
+                failures += RequireHudNamesItems(report, "헛간 씬", hud);
             }
 
             if (Object.FindFirstObjectByType<Camera>(FindObjectsInactive.Include) == null)

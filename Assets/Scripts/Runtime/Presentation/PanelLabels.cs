@@ -20,6 +20,46 @@ namespace FarmCreature.Presentation
             return creature.CurrentSpecies.displayName;
         }
 
+        /// <summary>
+        /// 소지품 한 줄. <b>id 가 아니라 표시 이름을 쓴다.</b>
+        ///
+        /// 인벤토리는 문자열 키 하나로 아이템과 알을 함께 담는다(설계 4.3). 그래서 이름을 찾으려면
+        /// <b>두 계통을 다 봐야</b> 한다 — 아이템에서 못 찾으면 알에서 찾는다.
+        ///
+        /// 어느 쪽에도 없으면 <b>id 를 그대로 보여준다.</b> 감추면 소지품이 조용히 사라져
+        /// "산 것이 어디 갔나" 가 되므로, 못생기더라도 보이는 편이 낫다.
+        ///
+        /// 아이템 id 는 표시 이름과 어긋나 있다(`hearty_feed` = 무쇠 발톱). 초기 이름 그대로 둔
+        /// 것이라 id 를 화면에 그대로 내보내면 읽는 사람이 헷갈린다.
+        /// </summary>
+        public static string InventoryLine(
+            string itemId, int count, ItemDatabase items, EggDatabase eggs)
+        {
+            return InventoryName(itemId, items, eggs) + " x" + count;
+        }
+
+        private static string InventoryName(string itemId, ItemDatabase items, EggDatabase eggs)
+        {
+            if (string.IsNullOrEmpty(itemId))
+            {
+                return "???";
+            }
+
+            var item = items != null ? items.Find(itemId) : null;
+            if (item != null && !string.IsNullOrEmpty(item.displayName))
+            {
+                return item.displayName;
+            }
+
+            var egg = eggs != null ? eggs.Find(itemId) : null;
+            if (egg != null && !string.IsNullOrEmpty(egg.displayName))
+            {
+                return egg.displayName;
+            }
+
+            return itemId;
+        }
+
         // ---------- 창고 ----------
 
         public static string StorageTitle(CreatureInstance target)
