@@ -209,12 +209,11 @@ namespace FarmCreature.Tests
         [UnityTest]
         public IEnumerator BattlePanel_RefusesToLeaveWithAnEmptyParty()
         {
+            // 전투터는 8/17 에 농장에서 자기 씬으로 나갔다. 농장에는 이제 패널이 없다.
             yield return LoadScene(FarmSceneName);
 
             var care = Object.FindFirstObjectByType<CareManager>();
-            var panel = Object.FindFirstObjectByType<BattlePanel>(FindObjectsInactive.Include);
             Assert.IsNotNull(care, "CareManager 가 없다");
-            Assert.IsNotNull(panel, "BattlePanel 이 없다");
 
             // 밖에 나와 있는 케어를 전부 헛간으로 돌려보낸다.
             while (care.State.Roster.Party.Count > 0)
@@ -222,17 +221,64 @@ namespace FarmCreature.Tests
                 care.State.Roster.LeaveParty(care.State.Roster.Party[0]);
             }
 
+            care.EnterScene(BattleGroundSceneRoot.SceneName);
+            yield return null;
+            yield return RunUntil(() =>
+                SceneManager.GetActiveScene().name == BattleGroundSceneRoot.SceneName);
+            yield return null;
+
+            var panel = Object.FindFirstObjectByType<BattlePanel>(FindObjectsInactive.Include);
+            Assert.IsNotNull(panel, "전투터 씬에 BattlePanel 이 없다");
+
             // 전투터는 2단계다 — 먼저 맵을 열고, 그다음 스테이지를 고른다 (설계 5절).
             panel.SelectRow(0);
             yield return null;
-            Assert.AreEqual(FarmSceneName, SceneManager.GetActiveScene().name,
+            Assert.AreEqual(BattleGroundSceneRoot.SceneName, SceneManager.GetActiveScene().name,
                 "맵을 고른 것만으로 씬이 바뀌면 안 된다");
 
             panel.SelectRow(0);
             yield return null;
 
-            Assert.AreEqual(FarmSceneName, SceneManager.GetActiveScene().name,
+            Assert.AreEqual(BattleGroundSceneRoot.SceneName, SceneManager.GetActiveScene().name,
                 "파티가 빈 채로 전투 씬에 들어갔다 — 들어가자마자 지고 돌아오게 된다");
+        }
+
+        [UnityTest]
+        public IEnumerator Battle_ReturnsToTheBattleGroundAndPaysThereOnce()
+        {
+            // ★ 8/17 에 바뀐 것. 전투가 끝나면 농장이 아니라 들어온 곳(전투터)으로 돌아오고,
+            // 보상은 거기서 한 번만 들어간다. 지급 규칙은 BattleReward 한 곳에 있다.
+            yield return LoadScene(BattleSceneName);
+
+            var root = FindRoot();
+            var encounter = root.practiceEncounter;
+            var state = MakeState(root.practiceSpecies, gold: 30);
+
+            BattleHandoff.SetRequest(state, encounter, null, BattleGroundSceneRoot.SceneName);
+            yield return LoadScene(BattleSceneName);
+            yield return RunUntil(() => BattleHandoff.HasResult);
+            Assert.IsTrue(BattleHandoff.HasResult, "전투가 끝나지 않았다");
+
+            int reward = PeekReward();
+
+            FindRoot().ExitBattle();
+            yield return null;
+            yield return RunUntil(() =>
+                SceneManager.GetActiveScene().name == BattleGroundSceneRoot.SceneName);
+            yield return null;
+
+            Assert.AreEqual(BattleGroundSceneRoot.SceneName, SceneManager.GetActiveScene().name,
+                "전투가 끝나고 농장으로 튕겨 나갔다 — 들어온 곳으로 돌아와야 한다");
+
+            var ground = Object.FindFirstObjectByType<BattleGroundSceneRoot>();
+            Assert.IsNotNull(ground, "전투터 씬이 열리지 않았다");
+
+            Assert.AreSame(state, ground.State,
+                "전투터가 세이브를 다시 읽었다 — 저장 전 진행이 날아간다");
+            Assert.AreEqual(30 + reward, ground.State.Gold,
+                "보상이 안 들어왔거나 두 번 들어왔다");
+            Assert.IsFalse(BattleHandoff.HasResult,
+                "결과가 남아 있으면 돌아올 때마다 보상이 다시 들어간다");
         }
 
         // ---------- 헬퍼 ----------

@@ -29,6 +29,13 @@ namespace FarmCreature.Core
         /// 스테이지가 속한 맵의 전장. 비어 있으면 인카운터의 맵, 그것도 없으면 기본 맵 (설계 2.1).
         /// </summary>
         public BattleMapData Field;
+
+        /// <summary>
+        /// 전투가 끝나면 돌아갈 씬. <b>들어온 곳으로 나온다</b> — 전투터가 씬이 되면서
+        /// 농장을 거치지 않고 다음 스테이지를 고를 수 있어야 하기 때문이다.
+        /// 비어 있으면 농장으로 간다 (전투 씬 단독 Play).
+        /// </summary>
+        public string ReturnScene;
     }
 
     /// <summary>
@@ -80,10 +87,23 @@ namespace FarmCreature.Core
         /// <summary>
         /// 전투를 시작한다. 짐은 여기 담고, 상태는 <see cref="SceneHandoff"/> 로 함께 맡긴다.
         /// </summary>
+        public static void SetRequest(
+            GameState state, BattleEncounter encounter, BattleMapData field, string returnScene)
+        {
+            request = new BattleRequest
+            {
+                Encounter = encounter,
+                Field = field,
+                ReturnScene = returnScene
+            };
+
+            SceneHandoff.Carry(state);
+        }
+
+        /// <summary>돌아갈 곳을 적지 않으면 농장이다.</summary>
         public static void SetRequest(GameState state, BattleEncounter encounter, BattleMapData field)
         {
-            request = new BattleRequest { Encounter = encounter, Field = field };
-            SceneHandoff.Carry(state);
+            SetRequest(state, encounter, field, null);
         }
 
         /// <summary>요청을 꺼내고 비운다. 없으면 <c>null</c> — 전투 씬을 단독으로 Play 한 경우다.</summary>

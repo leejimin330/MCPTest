@@ -56,6 +56,9 @@ namespace FarmCreature.Presentation
         /// <summary>이 전투가 어느 스테이지인가. 연습 전투면 빈 문자열이라 진행도가 안 남는다.</summary>
         private string stageId = string.Empty;
 
+        /// <summary>[나가기] 로 돌아갈 곳. 요청이 정하고, 없으면 농장이다.</summary>
+        private string returnScene = FarmSceneName;
+
         private readonly List<BattleUnitView> shownAllies = new List<BattleUnitView>();
         private readonly List<BattleUnitView> shownEnemies = new List<BattleUnitView>();
         private readonly StringBuilder builder = new StringBuilder();
@@ -80,6 +83,11 @@ namespace FarmCreature.Presentation
                 encounter = request.Encounter;
                 requestField = request.Field;
                 stageId = encounter != null ? encounter.stageId : string.Empty;
+
+                // 들어온 곳으로 나온다. 안 적혀 있으면 농장이다.
+                returnScene = string.IsNullOrEmpty(request.ReturnScene)
+                    ? FarmSceneName
+                    : request.ReturnScene;
             }
             else
             {
@@ -435,7 +443,7 @@ namespace FarmCreature.Presentation
                 BattleHandoff.SetResult(BattleConclusion.Aborted, 0, state, stageId);
             }
 
-            SceneManager.LoadScene(FarmSceneName);
+            SceneManager.LoadScene(returnScene);
         }
     }
 }
