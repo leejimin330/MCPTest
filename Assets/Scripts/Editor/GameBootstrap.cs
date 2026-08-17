@@ -444,7 +444,52 @@ namespace FarmCreature.EditorTools
                 EditorUtility.SetDirty(golem);
             }
 
+            SeedEnemyDrops(rat, boar, golem);
+
             return new List<EnemyData> { rat, boar, golem };
+        }
+
+        /// <summary>
+        /// 드랍 표를 깐다. <b>비어 있을 때만 채운다.</b>
+        ///
+        /// <see cref="EnemyData"/> 는 seed-only 라(함정 3.11) 이미 있는 에셋은 손대지 않는다.
+        /// 그런데 드랍은 <b>기존 에셋에 없던 항목</b>이라 그 규칙대로면 영영 안 들어간다.
+        /// 에셋을 지우고 다시 깔면 되지만, <see cref="BattleEncounter"/> 들이 이 적들을
+        /// 참조하고 있어 <b>지우면 스테이지의 적 참조가 전부 끊긴다.</b>
+        ///
+        /// 그래서 지우지 않고 <b>없는 것만 채운다</b> — 인스펙터에서 손댄 표는 절대 덮지 않고,
+        /// 새로 생긴 항목만 흘려넣는 방식이다. 표를 비워두고 싶으면 항목 하나를
+        /// 확률 0 으로 남겨두면 된다(비어 있지 않으므로 다시 채워지지 않는다).
+        ///
+        /// 드랍 구성 의도: 블룸 스톤이 전투로도 나온다 — 진화 분기(블로섬 가디언)가
+        /// 상점 구매 하나에만 매여 있지 않게 된다.
+        /// </summary>
+        private static void SeedEnemyDrops(EnemyData rat, EnemyData boar, EnemyData golem)
+        {
+            FillDropsIfEmpty(rat, Drop("hearty_feed", 15, 1));
+            FillDropsIfEmpty(boar, Drop("iron_grain", 25, 1));
+            FillDropsIfEmpty(golem, Drop("bloom_stone", 35, 1), Drop("egg_sprigling", 10, 1));
+        }
+
+        private static void FillDropsIfEmpty(EnemyData enemy, params DropEntry[] drops)
+        {
+            if (enemy == null)
+            {
+                return;
+            }
+
+            if (enemy.drops != null && enemy.drops.Count > 0)
+            {
+                return;   // 사람이 손댄 표다. 건드리지 않는다.
+            }
+
+            enemy.drops = new List<DropEntry>(drops);
+            EditorUtility.SetDirty(enemy);
+        }
+
+        private static DropEntry Drop(string itemId, int chancePercent, int count)
+        {
+            return new DropEntry { itemId = itemId, chancePercent = chancePercent, count = count };
         }
 
         /// <summary>

@@ -59,6 +59,12 @@ namespace FarmCreature.Presentation
         /// <summary>[나가기] 로 돌아갈 곳. 요청이 정하고, 없으면 농장이다.</summary>
         private string returnScene = FarmSceneName;
 
+        /// <summary>
+        /// 이 전투에 나온 적들(한 마리씩). 이기면 전멸했으므로 그대로 드랍을 굴린다 —
+        /// 그래서 시뮬레이터가 "누가 죽었는지" 를 알려줄 필요가 없다.
+        /// </summary>
+        private List<EnemyData> foesInBattle = new List<EnemyData>();
+
         private readonly List<BattleUnitView> shownAllies = new List<BattleUnitView>();
         private readonly List<BattleUnitView> shownEnemies = new List<BattleUnitView>();
         private readonly StringBuilder builder = new StringBuilder();
@@ -107,6 +113,7 @@ namespace FarmCreature.Presentation
         {
             var party = LivePartyOf(state);
             var foes = FoesOf(encounter);
+            foesInBattle = foes;
 
             // request.Field → encounter.map → defaultMap 순으로 물러난다 (설계 2.1).
             // 전장은 이제 StageMap 이 갖고 있으므로 요청에 실려 온다.
@@ -221,6 +228,15 @@ namespace FarmCreature.Presentation
         /// 인카운터를 적 목록으로 펼친다. 슬롯보다 많으면 <c>LogError</c> 로 알리고 잘라낸다 —
         /// 여기까지 왔다는 것은 <c>BuildAll</c> 의 검사를 지나쳤다는 뜻이라 조용히 넘기면 안 된다.
         /// </summary>
+        /// <summary>
+        /// 드랍을 굴린다. <b>seed 는 여기서 굴리고 규칙은 <see cref="DropResolver"/> 가 갖는다</b> —
+        /// 스폰 좌표와 같은 방식이다(설계 2.5). 그래서 게임은 매번 다르고 테스트는 결정적이다.
+        /// </summary>
+        private List<DropAward> RollDrops()
+        {
+            return DropResolver.Resolve(foesInBattle, Random.Range(int.MinValue, int.MaxValue));
+        }
+
         private static List<EnemyData> FoesOf(BattleEncounter encounter)
         {
             if (encounter == null)
@@ -352,13 +368,14 @@ namespace FarmCreature.Presentation
                 concluded = true;
                 RefreshUnits();
 
+                bool won = battle.Outcome == BattleOutcome.Victory;
+
                 BattleHandoff.SetResult(
-                    battle.Outcome == BattleOutcome.Victory
-                        ? BattleConclusion.Victory
-                        : BattleConclusion.Defeat,
-                    battle.Outcome == BattleOutcome.Victory ? battle.GoldReward : 0,
+                    won ? BattleConclusion.Victory : BattleConclusion.Defeat,
+                    won ? battle.GoldReward : 0,
                     state,
-                    stageId);
+                    stageId,
+                    won ? RollDrops() : null);
             }
 
             RefreshTexts();

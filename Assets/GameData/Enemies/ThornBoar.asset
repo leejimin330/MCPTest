@@ -19,4 +19,8 @@ MonoBehaviour:
   defense: 3
   attackInterval: 1.5
   goldReward: 18
+  drops:
+  - itemId: iron_grain
+    chancePercent: 25
+    count: 1
   placeholderColor: {r: 0.65, g: 0.4, b: 0.3, a: 1}

@@ -19,4 +19,11 @@ MonoBehaviour:
   defense: 6
   attackInterval: 1.9
   goldReward: 40
+  drops:
+  - itemId: bloom_stone
+    chancePercent: 35
+    count: 1
+  - itemId: egg_sprigling
+    chancePercent: 10
+    count: 1
   placeholderColor: {r: 0.5, g: 0.5, b: 0.55, a: 1}

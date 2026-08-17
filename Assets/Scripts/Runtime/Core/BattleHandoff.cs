@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FarmCreature.Data;
 
 namespace FarmCreature.Core
@@ -54,6 +55,12 @@ namespace FarmCreature.Core
         /// 연습 전투는 빈 문자열이라 아무것도 기록되지 않는다.
         /// </summary>
         public string StageId;
+
+        /// <summary>
+        /// 적에게서 나온 것들. <b>여기서 인벤토리에 넣지 않는다</b> — 재화와 같은 이유로
+        /// <see cref="BattleReward"/> 한 곳에서만 넣는다. 확률은 이미 굴려진 결과다.
+        /// </summary>
+        public List<DropAward> Drops;
     }
 
     /// <summary>
@@ -118,16 +125,25 @@ namespace FarmCreature.Core
         /// 전투를 끝낸다. 짐은 여기 담고, 상태는 <see cref="SceneHandoff"/> 로 함께 돌려보낸다.
         /// </summary>
         public static void SetResult(
-            BattleConclusion conclusion, int goldReward, GameState state, string stageId)
+            BattleConclusion conclusion, int goldReward, GameState state, string stageId,
+            List<DropAward> drops)
         {
             result = new BattleResult
             {
                 Conclusion = conclusion,
                 GoldReward = goldReward < 0 ? 0 : goldReward,
-                StageId = stageId
+                StageId = stageId,
+                Drops = drops
             };
 
             SceneHandoff.Carry(state);
+        }
+
+        /// <summary>드랍이 없을 때. 패배·중도 이탈이 이쪽이다.</summary>
+        public static void SetResult(
+            BattleConclusion conclusion, int goldReward, GameState state, string stageId)
+        {
+            SetResult(conclusion, goldReward, state, stageId, null);
         }
 
         /// <summary>결과를 꺼내고 비운다. 없으면 <c>null</c> — 전투를 거치지 않고 농장을 연 경우다.</summary>
